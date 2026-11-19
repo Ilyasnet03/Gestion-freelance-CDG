@@ -144,4 +144,40 @@ public class TimesheetServiceTest {
 
         assertTrue(exception.getMessage().contains("verrouillée"));
     }
+
+    @Test
+    @DisplayName("Un chef ne voit pas une timesheet couvrant aussi le projet d'un autre chef")
+    void testListTimesheets_HidesMixedProjectTimesheetFromChef() {
+        Utilisateur chef = new Utilisateur("Chef", "CDG", "chef@cdg.ma", "hash", Role.CHEF_PROJET, true);
+        chef.setId(20L);
+        Utilisateur autreChef = new Utilisateur("Autre", "Chef", "autre@cdg.ma", "hash", Role.CHEF_PROJET, true);
+        autreChef.setId(21L);
+
+        Projet projetDuChef = new Projet();
+        projetDuChef.setId(101L);
+        projetDuChef.setChefProjet(chef);
+        tache.setProjet(projetDuChef);
+
+        Projet projetAutreChef = new Projet();
+        projetAutreChef.setId(102L);
+        projetAutreChef.setChefProjet(autreChef);
+        Tache autreTache = new Tache();
+        autreTache.setProjet(projetAutreChef);
+
+        LigneTimesheet ligneChef = new LigneTimesheet();
+        ligneChef.setTimesheet(timesheet);
+        ligneChef.setTache(tache);
+        LigneTimesheet ligneAutreChef = new LigneTimesheet();
+        ligneAutreChef.setTimesheet(timesheet);
+        ligneAutreChef.setTache(autreTache);
+
+        when(timesheetRepository.findAll()).thenReturn(List.of(timesheet));
+        when(ligneTimesheetRepository.findAllByTimesheetId(timesheet.getId()))
+                .thenReturn(List.of(ligneChef, ligneAutreChef));
+
+        List<TimesheetDto> result = timesheetService.listTimesheets(null, new UserPrincipal(chef));
+
+        assertTrue(result.isEmpty());
+        verifyNoInteractions(mapper);
+    }
 }

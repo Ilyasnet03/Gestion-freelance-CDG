@@ -59,7 +59,7 @@ public class FreelanceController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'CHEF_PROJET')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Créer une nouvelle fiche freelance")
     public ResponseEntity<FreelanceDto> createFreelance(@Valid @RequestBody CreateFreelanceRequest req) {
         return ResponseEntity.status(HttpStatus.CREATED).body(freelanceService.createFreelance(req));
@@ -68,7 +68,8 @@ public class FreelanceController {
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'CHEF_PROJET')")
     @Operation(summary = "Mettre à jour une fiche freelance")
-    public ResponseEntity<FreelanceDto> updateFreelance(@PathVariable Long id, @Valid @RequestBody UpdateFreelanceRequest req) {
-        return ResponseEntity.ok(freelanceService.updateFreelance(id, req));
+    public ResponseEntity<FreelanceDto> updateFreelance(@PathVariable Long id, @Valid @RequestBody UpdateFreelanceRequest req,
+                                                        @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(freelanceService.updateFreelance(id, req, principal));
     }
 }

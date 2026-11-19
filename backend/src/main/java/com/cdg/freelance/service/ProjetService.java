@@ -58,18 +58,7 @@ public class ProjetService {
         } else if (currentUser.getRole() == Role.CHEF_PROJET) {
             projets = projetRepository.findAllByChefProjetId(currentUser.getId());
         } else {
-            // Freelance: get projects through active/past affectations
-            Freelance freelance = freelanceRepository.findByUtilisateurId(currentUser.getId())
-                    .orElse(null);
-            if (freelance != null) {
-                projets = affectationRepository.findAllByFreelanceId(freelance.getId()).stream()
-                        .map(Affectation::getProjet)
-                        .distinct()
-                        .collect(Collectors.toList());
-            } else {
-                projets = List.of();
-            }
-
+            throw new AccessDeniedException("Seuls les administrateurs et chefs de projet peuvent consulter les projets");
         }
 
         return projets.stream().map(p -> {
@@ -98,6 +87,7 @@ public class ProjetService {
 
     @Transactional
     public ProjetDto createProjet(CreateProjetRequest req, UserPrincipal currentUser) {
+        requireProjectManager(currentUser);
         if (projetRepository.existsByCode(req.getCode().trim().toUpperCase())) {
             throw new BusinessException("Un projet avec ce code existe déjà : " + req.getCode());
         }
@@ -136,9 +126,15 @@ public class ProjetService {
 
     @Transactional
     public ProjetDto updateProjet(Long id, UpdateProjetRequest req, UserPrincipal currentUser) {
+        requireProjectManager(currentUser);
         Projet p = projetRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Projet non trouvé avec l'id : " + id));
         ensureProjectAccess(p, currentUser);
+
+        if (req.getChefProjetId() != null
+                && !req.getChefProjetId().equals(currentUser.getId())) {
+            throw new AccessDeniedException("Un chef de projet ne peut pas transférer son projet à un autre compte");
+        }
 
         if (req.getDateFinPrevue().isBefore(req.getDateDebut())) {
             throw new BusinessException("La date de fin prévue doit être postérieure à la date de début");
@@ -172,6 +168,7 @@ public class ProjetService {
 
     @Transactional
     public AffectationDto addAffectation(Long projetId, CreateAffectationRequest req, UserPrincipal currentUser) {
+        requireProjectManager(currentUser);
         Projet projet = projetRepository.findById(projetId)
                 .orElseThrow(() -> new ResourceNotFoundException("Projet non trouvé avec l'id : " + projetId));
         ensureProjectAccess(projet, currentUser);
@@ -306,13 +303,13 @@ public class ProjetService {
                 && projet.getChefProjet().getId().equals(currentUser.getId())) {
             return;
         }
-        if (currentUser.getRole() == Role.FREELANCE) {
-            Freelance freelance = freelanceRepository.findByUtilisateurId(currentUser.getId()).orElse(null);
-            if (freelance != null && affectationRepository.findByProjetIdAndFreelanceId(projet.getId(), freelance.getId()).isPresent()) {
-                return;
-            }
-        }
         throw new AccessDeniedException("Ce projet ne relève pas de votre périmètre");
+    }
+
+    private void requireProjectManager(UserPrincipal currentUser) {
+        if (currentUser.getRole() != Role.CHEF_PROJET) {
+            throw new AccessDeniedException("Seul un chef de projet peut modifier les projets");
+        }
     }
 
     public BigDecimal calculateBudgetConsomme(Long projetId) {

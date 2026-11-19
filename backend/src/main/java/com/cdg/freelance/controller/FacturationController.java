@@ -63,7 +63,8 @@ public class FacturationController {
     @PatchMapping("/paiements/{id}")
     @PreAuthorize("hasAnyRole('CHEF_PROJET', 'ADMIN')")
     @Operation(summary = "Mettre à jour le statut du paiement (ex: EN_ATTENTE -> PAYE)")
-    public ResponseEntity<PaiementDto> updatePaiement(@PathVariable Long id, @Valid @RequestBody UpdatePaiementRequest req) {
-        return ResponseEntity.ok(paiementService.updatePaiement(id, req));
+    public ResponseEntity<PaiementDto> updatePaiement(@PathVariable Long id, @Valid @RequestBody UpdatePaiementRequest req,
+                                                       @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(paiementService.updatePaiement(id, req, principal));
     }
 }

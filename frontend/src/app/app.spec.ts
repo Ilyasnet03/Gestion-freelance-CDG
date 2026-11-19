@@ -127,6 +127,90 @@ describe('App', () => {
     http.verify();
   });
 
+  it('routes a freelance user to missions instead of the management dashboard', async () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+    app.user = {
+      id: 8,
+      email: 'freelance@cdg.ma',
+      prenom: 'Nora',
+      nom: 'Rivière',
+      role: 'FREELANCE',
+    };
+    const http = TestBed.inject(HttpTestingController);
+
+    const loading = app.loadView();
+    expect(app.currentView).toBe('my-missions');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    http.expectOne('/api/mes-missions').flush([]);
+    await loading;
+
+    http.expectNone('/api/dashboard/kpi');
+    http.expectNone('/api/projets');
+    http.verify();
+  });
+
+  it('keeps project mutations and timesheet validation exclusive to the project manager', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+
+    app.user = {
+      id: 1,
+      email: 'admin@cdg.ma',
+      prenom: 'Admin',
+      nom: 'CDG',
+      role: 'ADMIN',
+    };
+    app.currentView = 'projects';
+    expect(app.canCreate).toBe(false);
+    app.currentView = 'timesheets';
+    expect(app.actionLabel({ statut: 'SOUMISE' })).toBe('Détails');
+    expect(app.canConfirmPayment({ paiementId: 2, paiementStatut: 'EN_ATTENTE' })).toBe(false);
+
+    app.user = {
+      id: 2,
+      email: 'chef@cdg.ma',
+      prenom: 'Chef',
+      nom: 'CDG',
+      role: 'CHEF_PROJET',
+    };
+    app.currentView = 'projects';
+    expect(app.canCreate).toBe(true);
+    app.currentView = 'timesheets';
+    expect(app.actionLabel({ statut: 'SOUMISE' })).toBe('Valider');
+    expect(app.canConfirmPayment({ paiementId: 2, paiementStatut: 'EN_ATTENTE' })).toBe(true);
+    expect(app.canConfirmPayment({ paiementId: 2, paiementStatut: 'PAYE' })).toBe(false);
+  });
+
+  it('associates the project manager payment action with its timesheet', async () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+    app.user = {
+      id: 2,
+      email: 'chef@cdg.ma',
+      prenom: 'Chef',
+      nom: 'CDG',
+      role: 'CHEF_PROJET',
+    };
+    app.currentView = 'timesheets';
+    const http = TestBed.inject(HttpTestingController);
+
+    const loading = app.loadView();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    http.expectOne('/api/timesheets').flush([
+      { id: 10, statut: 'VALIDEE', semaineDebut: '2026-03-02' },
+    ]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    http.expectOne('/api/paiements').flush([
+      { id: 20, timesheetId: 10, statut: 'EN_ATTENTE' },
+    ]);
+    await loading;
+
+    expect(app.rows[0]['paiementId']).toBe(20);
+    expect(app.canConfirmPayment(app.rows[0])).toBe(true);
+    http.verify();
+  });
+
   it('should display the dashboard after login data loads', async () => {
     const fixture = TestBed.createComponent(App);
     fixture.autoDetectChanges();

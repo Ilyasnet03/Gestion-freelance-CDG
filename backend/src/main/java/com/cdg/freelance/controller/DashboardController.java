@@ -24,7 +24,7 @@ public class DashboardController {
     }
 
     @GetMapping("/kpi")
-    @PreAuthorize("hasAnyRole('CHEF_PROJET', 'ADMIN', 'FREELANCE')")
+    @PreAuthorize("hasAnyRole('CHEF_PROJET', 'ADMIN')")
     @Operation(summary = "Obtenir les indicateurs, graphiques budgétaires et alertes récentes pour le profil connecté")
     public ResponseEntity<DashboardKpiDto> getKpi(@AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(dashboardService.getDashboardKpi(principal));

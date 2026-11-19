@@ -10,6 +10,7 @@ import com.cdg.freelance.mapper.EntityMapper;
 import com.cdg.freelance.repository.AlerteRepository;
 import com.cdg.freelance.repository.TimesheetRepository;
 import com.cdg.freelance.security.UserPrincipal;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +41,10 @@ public class DashboardService {
 
     @Transactional(readOnly = true)
     public DashboardKpiDto getDashboardKpi(UserPrincipal currentUser) {
+        if (currentUser.getRole() != com.cdg.freelance.entity.Role.ADMIN
+                && currentUser.getRole() != com.cdg.freelance.entity.Role.CHEF_PROJET) {
+            throw new AccessDeniedException("Le tableau de bord est réservé aux chefs de projet et administrateurs");
+        }
         DashboardKpiDto dto = new DashboardKpiDto();
 
         List<ProjetDto> userProjets = projetService.listProjets(currentUser);

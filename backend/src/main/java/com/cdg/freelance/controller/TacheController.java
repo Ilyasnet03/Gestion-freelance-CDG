@@ -32,6 +32,7 @@ public class TacheController {
     }
 
     @GetMapping("/projets/{id}/taches")
+    @PreAuthorize("hasAnyRole('CHEF_PROJET', 'ADMIN')")
     @Operation(summary = "Lister les tâches d'un projet")
     public ResponseEntity<List<TacheDto>> listTachesByProjet(@PathVariable Long id,
                                                              @AuthenticationPrincipal UserPrincipal principal) {
@@ -39,8 +40,15 @@ public class TacheController {
         return ResponseEntity.ok(tacheService.listTachesByProjet(id));
     }
 
+    @GetMapping("/mes-missions")
+    @PreAuthorize("hasRole('FREELANCE')")
+    @Operation(summary = "Lister les tâches affectées au freelance connecté")
+    public ResponseEntity<List<TacheDto>> listMesMissions(@AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(tacheService.listMesMissions(principal));
+    }
+
     @PostMapping("/projets/{id}/taches")
-    @PreAuthorize("hasAnyRole('CHEF_PROJET', 'ADMIN')")
+    @PreAuthorize("hasRole('CHEF_PROJET')")
     @Operation(summary = "Créer une nouvelle tâche dans un projet")
     public ResponseEntity<TacheDto> createTache(@PathVariable Long id, @Valid @RequestBody CreateTacheRequest req,
                                                 @AuthenticationPrincipal UserPrincipal principal) {
@@ -49,6 +57,7 @@ public class TacheController {
     }
 
     @GetMapping("/taches/{id}")
+    @PreAuthorize("hasAnyRole('CHEF_PROJET', 'ADMIN')")
     @Operation(summary = "Consulter le détail d'une tâche")
     public ResponseEntity<TacheDto> getTache(@PathVariable Long id,
                                              @AuthenticationPrincipal UserPrincipal principal) {
@@ -58,7 +67,7 @@ public class TacheController {
     }
 
     @PutMapping("/taches/{id}")
-    @PreAuthorize("hasAnyRole('CHEF_PROJET', 'ADMIN')")
+    @PreAuthorize("hasRole('CHEF_PROJET')")
     @Operation(summary = "Mettre à jour une tâche")
     public ResponseEntity<TacheDto> updateTache(@PathVariable Long id, @Valid @RequestBody UpdateTacheRequest req,
                                                 @AuthenticationPrincipal UserPrincipal principal) {
@@ -68,7 +77,7 @@ public class TacheController {
     }
 
     @PatchMapping("/taches/{id}/avancement")
-    @PreAuthorize("hasAnyRole('CHEF_PROJET', 'ADMIN', 'FREELANCE')")
+    @PreAuthorize("hasRole('CHEF_PROJET')")
     @Operation(summary = "Mettre à jour le pourcentage d'avancement d'une tâche (0 à 100%)")
     public ResponseEntity<TacheDto> updateAvancement(@PathVariable Long id, @Valid @RequestBody UpdateAvancementRequest req,
                                                       @AuthenticationPrincipal UserPrincipal principal) {

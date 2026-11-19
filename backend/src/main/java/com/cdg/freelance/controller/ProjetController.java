@@ -27,18 +27,21 @@ public class ProjetController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('CHEF_PROJET', 'ADMIN')")
     @Operation(summary = "Lister les projets accessibles à l'utilisateur")
     public ResponseEntity<List<ProjetDto>> listProjets(@AuthenticationPrincipal UserPrincipal principal) {
         return ResponseEntity.ok(projetService.listProjets(principal));
     }
 
     @GetMapping("/types")
+    @PreAuthorize("hasAnyRole('CHEF_PROJET', 'ADMIN')")
     @Operation(summary = "Lister les types de projet disponibles")
     public ResponseEntity<List<TypeProjetDto>> listTypesProjet() {
         return ResponseEntity.ok(projetService.listTypesProjet());
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('CHEF_PROJET', 'ADMIN')")
     @Operation(summary = "Consulter le détail d'un projet")
     public ResponseEntity<ProjetDto> getProjet(@PathVariable Long id,
                                                 @AuthenticationPrincipal UserPrincipal principal) {
@@ -46,7 +49,7 @@ public class ProjetController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('CHEF_PROJET', 'ADMIN')")
+    @PreAuthorize("hasRole('CHEF_PROJET')")
     @Operation(summary = "Créer un nouveau projet")
     public ResponseEntity<ProjetDto> createProjet(@Valid @RequestBody CreateProjetRequest req,
                                                     @AuthenticationPrincipal UserPrincipal principal) {
@@ -54,7 +57,7 @@ public class ProjetController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('CHEF_PROJET', 'ADMIN')")
+    @PreAuthorize("hasRole('CHEF_PROJET')")
     @Operation(summary = "Modifier les informations d'un projet")
     public ResponseEntity<ProjetDto> updateProjet(@PathVariable Long id, @Valid @RequestBody UpdateProjetRequest req,
                                                   @AuthenticationPrincipal UserPrincipal principal) {
@@ -62,7 +65,7 @@ public class ProjetController {
     }
 
     @PostMapping("/{id}/affectations")
-    @PreAuthorize("hasAnyRole('CHEF_PROJET', 'ADMIN')")
+    @PreAuthorize("hasRole('CHEF_PROJET')")
     @Operation(summary = "Affecter un freelance à un projet avec son TJM négocié")
     public ResponseEntity<AffectationDto> addAffectation(@PathVariable Long id, @Valid @RequestBody CreateAffectationRequest req,
                                                          @AuthenticationPrincipal UserPrincipal principal) {
@@ -78,6 +81,7 @@ public class ProjetController {
     }
 
     @GetMapping("/{id}/avancement")
+    @PreAuthorize("hasAnyRole('CHEF_PROJET', 'ADMIN')")
     @Operation(summary = "Consulter le suivi d'avancement et la consommation du budget du projet")
     public ResponseEntity<ProjetAvancementDto> getAvancement(@PathVariable Long id,
                                                               @AuthenticationPrincipal UserPrincipal principal) {

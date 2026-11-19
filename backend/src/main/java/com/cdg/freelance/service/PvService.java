@@ -101,21 +101,18 @@ public class PvService {
                     .collect(Collectors.toList());
         } else if (currentUser.getRole() == Role.CHEF_PROJET) {
             pvs = pvs.stream()
-                    .filter(pv -> {
-                        if (pv.getTimesheet() == null || pv.getTimesheet().getLignes().isEmpty()) return false;
-                        Tache t = pv.getTimesheet().getLignes().get(0).getTache();
-                        return t != null && t.getProjet() != null &&
-                                t.getProjet().getChefProjet().getId().equals(currentUser.getId());
-                    })
+                    .filter(pv -> isManagedByChef(pv, currentUser.getId()))
                     .collect(Collectors.toList());
         }
 
         return pvs.stream().map(pv -> {
             PvDto dto = mapper.toPvDto(pv);
-            paiementRepository.findByPvReceptionId(pv.getId()).ifPresent(p -> {
-                dto.setPaiementId(p.getId());
-                dto.setPaiementStatut(p.getStatut());
-            });
+            if (currentUser.getRole() != Role.FREELANCE) {
+                paiementRepository.findByPvReceptionId(pv.getId()).ifPresent(p -> {
+                    dto.setPaiementId(p.getId());
+                    dto.setPaiementStatut(p.getStatut());
+                });
+            }
             return dto;
         }).collect(Collectors.toList());
     }
@@ -127,10 +124,12 @@ public class PvService {
         ensureUserCanAccessPv(pv, currentUser);
 
         PvDto dto = mapper.toPvDto(pv);
-        paiementRepository.findByPvReceptionId(pv.getId()).ifPresent(p -> {
-            dto.setPaiementId(p.getId());
-            dto.setPaiementStatut(p.getStatut());
-        });
+        if (currentUser.getRole() != Role.FREELANCE) {
+            paiementRepository.findByPvReceptionId(pv.getId()).ifPresent(p -> {
+                dto.setPaiementId(p.getId());
+                dto.setPaiementStatut(p.getStatut());
+            });
+        }
         return dto;
     }
 
@@ -179,7 +178,9 @@ public class PvService {
             throw new AccessDeniedException("Ce PV ne relève pas de vos missions");
         }
 
-        if (currentUser.getRole() == Role.CHEF_PROJET && timesheet.getLignes() != null) {
+        if (currentUser.getRole() == Role.CHEF_PROJET
+                && timesheet.getLignes() != null
+                && !timesheet.getLignes().isEmpty()) {
             boolean belongsToChef = timesheet.getLignes().stream()
                     .map(LigneTimesheet::getTache)
                     .filter(java.util.Objects::nonNull)
@@ -187,13 +188,27 @@ public class PvService {
                     .filter(java.util.Objects::nonNull)
                     .map(Projet::getChefProjet)
                     .filter(java.util.Objects::nonNull)
-                    .anyMatch(chef -> chef.getId().equals(currentUser.getId()));
+                    .allMatch(chef -> chef.getId().equals(currentUser.getId()))
+                    && timesheet.getLignes().stream().allMatch(line -> line.getTache() != null
+                        && line.getTache().getProjet() != null
+                        && line.getTache().getProjet().getChefProjet() != null);
             if (belongsToChef) {
                 return;
             }
         }
 
         throw new AccessDeniedException("Ce PV ne relève pas de votre périmètre");
+    }
+
+    private boolean isManagedByChef(PvReception pv, Long chefProjetId) {
+        Timesheet timesheet = pv.getTimesheet();
+        return timesheet != null
+                && timesheet.getLignes() != null
+                && !timesheet.getLignes().isEmpty()
+                && timesheet.getLignes().stream().allMatch(line -> line.getTache() != null
+                    && line.getTache().getProjet() != null
+                    && line.getTache().getProjet().getChefProjet() != null
+                    && line.getTache().getProjet().getChefProjet().getId().equals(chefProjetId));
     }
 
     private String generatePdfDocument(PvReception pv, Timesheet timesheet, BigDecimal tjmApplique) {

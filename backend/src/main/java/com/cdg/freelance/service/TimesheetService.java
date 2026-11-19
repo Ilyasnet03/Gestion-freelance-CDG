@@ -252,8 +252,8 @@ public class TimesheetService {
         Timesheet timesheet = timesheetRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Timesheet non trouvée avec l'id : " + id));
 
-        if (currentUser.getRole() != Role.CHEF_PROJET && currentUser.getRole() != Role.ADMIN) {
-            throw new UnauthorizedException("Seul un chef de projet ou un administrateur peut valider une timesheet");
+        if (currentUser.getRole() != Role.CHEF_PROJET) {
+            throw new UnauthorizedException("Seul un chef de projet peut valider une timesheet");
         }
 
         if (currentUser.getRole() == Role.CHEF_PROJET && !isTimesheetManagedByChef(timesheet, currentUser.getId())) {
@@ -288,7 +288,7 @@ public class TimesheetService {
         Timesheet timesheet = timesheetRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Timesheet non trouvée avec l'id : " + id));
 
-        if (currentUser.getRole() != Role.CHEF_PROJET && currentUser.getRole() != Role.ADMIN) {
+        if (currentUser.getRole() != Role.CHEF_PROJET) {
             throw new UnauthorizedException("Seul un chef de projet peut rejeter une timesheet");
         }
 
@@ -325,15 +325,28 @@ public class TimesheetService {
     private boolean isTimesheetManagedByChef(Timesheet t, Long chefProjetId) {
         List<LigneTimesheet> lignes = ligneTimesheetRepository.findAllByTimesheetId(t.getId());
         if (!lignes.isEmpty()) {
-            Tache firstTache = lignes.get(0).getTache();
-            if (firstTache != null && firstTache.getProjet() != null && firstTache.getProjet().getChefProjet() != null) {
-                return firstTache.getProjet().getChefProjet().getId().equals(chefProjetId);
-            }
+            return lignes.stream()
+                    .map(LigneTimesheet::getTache)
+                    .filter(java.util.Objects::nonNull)
+                    .map(Tache::getProjet)
+                    .filter(java.util.Objects::nonNull)
+                    .map(Projet::getChefProjet)
+                    .filter(java.util.Objects::nonNull)
+                    .allMatch(chef -> chef.getId().equals(chefProjetId))
+                    && lignes.stream().allMatch(ligne -> ligne.getTache() != null
+                        && ligne.getTache().getProjet() != null
+                        && ligne.getTache().getProjet().getChefProjet() != null);
         }
         // Fallback: check active affectations of the freelance
+        if (t.getFreelance() == null || t.getSemaineDebut() == null) {
+            return false;
+        }
         List<Affectation> affectations = affectationRepository.findActiveAffectationsByFreelanceAndDate(
                 t.getFreelance().getId(), t.getSemaineDebut());
-        return affectations.stream().anyMatch(a -> a.getProjet().getChefProjet().getId().equals(chefProjetId));
+        return !affectations.isEmpty() && affectations.stream()
+                .allMatch(a -> a.getProjet() != null
+                        && a.getProjet().getChefProjet() != null
+                        && a.getProjet().getChefProjet().getId().equals(chefProjetId));
     }
 
     private BigDecimal determineTjmApplique(Timesheet t) {

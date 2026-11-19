@@ -36,6 +36,7 @@ type ViewId =
   | 'dashboard'
   | 'projects'
   | 'freelancers'
+  | 'my-missions'
   | 'timesheets'
   | 'billing'
   | 'my-pvs'
@@ -83,9 +84,10 @@ export class App implements OnInit {
   @ViewChild('detailDialog') private detailDialogTemplate?: TemplateRef<unknown>;
 
   readonly menu: MenuItem[] = [
-    { id: 'dashboard', title: "Vue d'ensemble" },
+    { id: 'dashboard', title: "Vue d'ensemble", roles: ['ADMIN', 'CHEF_PROJET'] },
     { id: 'projects', title: 'Projets', roles: ['ADMIN', 'CHEF_PROJET'] },
     { id: 'freelancers', title: 'Freelances', roles: ['ADMIN', 'CHEF_PROJET'] },
+    { id: 'my-missions', title: 'Mes missions', roles: ['FREELANCE'] },
     { id: 'timesheets', title: 'Feuilles de temps' },
     { id: 'billing', title: 'Facturation', roles: ['ADMIN', 'CHEF_PROJET'] },
     { id: 'my-pvs', title: 'Mes PV', roles: ['FREELANCE'] },
@@ -111,6 +113,15 @@ export class App implements OnInit {
       { key: 'tjm', label: 'TJM' },
       { key: 'statut', label: 'Statut' },
       { key: 'email', label: 'E-mail' },
+    ],
+    'my-missions': [
+      { key: 'projetNom', label: 'Projet' },
+      { key: 'titre', label: 'Tâche' },
+      { key: 'chargeEstimee', label: 'Charge estimée (jours)' },
+      { key: 'avancement', label: 'Avancement' },
+      { key: 'statut', label: 'Statut' },
+      { key: 'dateDebut', label: 'Début' },
+      { key: 'dateFin', label: 'Fin' },
     ],
     timesheets: [
       { key: 'semaineDebut', label: 'Semaine du' },
@@ -175,7 +186,6 @@ export class App implements OnInit {
   password = '';
   error = '';
   notice = '';
-  projectChiefs: ApiRow[] = [];
   selectedSheet: ApiRow | null = null;
   selectedProject: ApiRow | null = null;
   taskOptions: ApiRow[] = [];
@@ -186,13 +196,17 @@ export class App implements OnInit {
   }
 
   get columns(): Column[] {
-    return this.columnsByView[this.currentView];
+    const columns = this.columnsByView[this.currentView];
+    return this.currentView === 'timesheets' && this.user?.role !== 'FREELANCE'
+      ? [...columns, { key: 'paiementStatut', label: 'Paiement' }]
+      : columns;
   }
 
   get sectionTitle(): string {
     const titles: Partial<Record<ViewId, string>> = {
       projects: 'Portefeuille projets',
       freelancers: 'Répertoire des freelances',
+      'my-missions': 'Mes missions',
       timesheets: 'Suivi des feuilles de temps',
       billing: 'Facturation & règlements',
       'my-pvs': 'Mes procès-verbaux de réception',
@@ -204,6 +218,9 @@ export class App implements OnInit {
   }
 
   get sectionHint(): string {
+    if (this.currentView === 'my-missions') {
+      return 'Consultez les tâches qui vous sont affectées et leur avancement.';
+    }
     if (this.currentView === 'timesheets') {
       return this.user?.role === 'FREELANCE'
         ? 'Saisissez vos heures et soumettez-les à validation.'
@@ -256,6 +273,17 @@ export class App implements OnInit {
         { key: 'dateFin', label: 'Fin' },
       ];
     }
+    if (this.currentView === 'my-missions') {
+      return [
+        { key: 'titre', label: 'Tâche' },
+        { key: 'projetNom', label: 'Projet' },
+        { key: 'chargeEstimee', label: 'Charge estimée (jours)' },
+        { key: 'avancement', label: 'Avancement' },
+        { key: 'statut', label: 'Statut' },
+        { key: 'dateDebut', label: 'Début' },
+        { key: 'dateFin', label: 'Fin' },
+      ];
+    }
     return [
       { key: 'dateSaisie', label: 'Date' },
       { key: 'projetNom', label: 'Projet' },
@@ -267,7 +295,7 @@ export class App implements OnInit {
   get detailColumnKeys(): string[] {
     return [
       ...this.detailColumns.map((column) => column.key),
-      ...(this.currentView === 'projects' || this.canEditSelectedSheet
+      ...((this.currentView === 'projects' && this.user?.role === 'CHEF_PROJET') || this.canEditSelectedSheet
         ? ['actions']
         : []),
     ];
@@ -282,7 +310,7 @@ export class App implements OnInit {
 
   get canCreate(): boolean {
     return (
-      (this.currentView === 'projects' && this.canManage) ||
+      (this.currentView === 'projects' && this.user?.role === 'CHEF_PROJET') ||
       (this.currentView === 'timesheets' && this.user?.role === 'FREELANCE') ||
       this.currentView === 'users'
     );
@@ -381,6 +409,7 @@ export class App implements OnInit {
   }
 
   async loadView(): Promise<void> {
+    this.ensureAccessibleView();
     this.loading = true;
     this.error = '';
     try {
@@ -397,8 +426,27 @@ export class App implements OnInit {
         case 'freelancers':
           this.rows = await this.api.get<ApiRow[]>('/api/freelances');
           break;
+        case 'my-missions':
+          this.rows = await this.api.get<ApiRow[]>('/api/mes-missions');
+          break;
         case 'timesheets':
           this.rows = await this.api.get<ApiRow[]>('/api/timesheets');
+          if (this.user?.role !== 'FREELANCE') {
+            const payments = await this.api.get<ApiRow[]>('/api/paiements');
+            const paymentsByTimesheet = new Map(
+              payments.map((payment) => [this.number(payment, 'timesheetId'), payment]),
+            );
+            this.rows = this.rows.map((sheet) => {
+              const payment = paymentsByTimesheet.get(this.number(sheet, 'id'));
+              return payment
+                ? {
+                    ...sheet,
+                    paiementId: this.number(payment, 'id'),
+                    paiementStatut: this.text(payment, 'statut'),
+                  }
+                : sheet;
+            });
+          }
           break;
         case 'billing':
           [this.secondaryRows, this.rows] = await Promise.all([
@@ -422,6 +470,7 @@ export class App implements OnInit {
           ]);
           break;
       }
+
     } catch (error: unknown) {
       this.setError(error);
       if (!this.api.token) this.logout();
@@ -431,26 +480,23 @@ export class App implements OnInit {
     }
   }
 
+  private ensureAccessibleView(): void {
+    if (this.visibleMenu.some((item) => item.id === this.currentView)) return;
+    this.currentView = this.user?.role === 'FREELANCE' ? 'my-missions' : 'dashboard';
+  }
+
   async startCreate(): Promise<void> {
     const today = this.dateInputValue(new Date());
     let data: ActionDialogData;
     if (this.currentView === 'projects') {
       try {
         this.projectTypes = await this.api.get<ApiRow[]>('/api/projets/types');
-        if (this.user?.role === 'ADMIN') {
-          this.projectChiefs = (await this.api.get<ApiRow[]>('/api/admin/utilisateurs'))
-            .filter((user) => ['ADMIN', 'CHEF_PROJET'].includes(this.text(user, 'role')));
-        }
       } catch (error: unknown) {
         this.setError(error);
         return;
       }
       if (!this.projectTypes.length) {
         this.setError('Aucun type de projet n’est disponible. Ajoutez-en un dans les paramètres.');
-        return;
-      }
-      if (this.user?.role === 'ADMIN' && !this.projectChiefs.length) {
-        this.setError('Aucun chef de projet n’est disponible pour ce nouveau projet.');
         return;
       }
       const fields: ActionDialogField[] = [
@@ -470,18 +516,6 @@ export class App implements OnInit {
           })),
         },
       ];
-      if (this.user?.role === 'ADMIN') {
-        fields.push({
-          key: 'chefProjetId',
-          label: 'Chef de projet',
-          type: 'select',
-          required: true,
-          options: this.projectChiefs.map((chief) => ({
-            value: this.number(chief, 'id'),
-            label: this.text(chief, 'nomComplet'),
-          })),
-        });
-      }
       fields.push({
         key: 'description',
         label: 'Description',
@@ -565,10 +599,7 @@ export class App implements OnInit {
           dateDebut: values['dateDebut'],
           dateFinPrevue: values['dateFinPrevue'],
           typeProjetId: Number(values['typeProjetId']),
-          chefProjetId:
-            this.user?.role === 'ADMIN'
-              ? Number(values['chefProjetId'])
-              : this.user?.id,
+          chefProjetId: this.user?.id,
           description: values['description'] ?? '',
         });
       } else if (this.currentView === 'timesheets') {
@@ -607,6 +638,9 @@ export class App implements OnInit {
         this.projectAssignments = this.canManage
           ? await this.api.get<ApiRow[]>(`/api/projets/${id}/affectations`)
           : [];
+      } else if (this.currentView === 'my-missions') {
+        this.detailTitle = `Mission — ${this.text(row, 'titre')}`;
+        this.detailRows = [row];
       } else if (this.currentView === 'timesheets') {
         const sheet = await this.api.get<ApiRow>(`/api/timesheets/${id}`);
         this.selectedSheet = sheet;
@@ -615,15 +649,7 @@ export class App implements OnInit {
           ? (sheet['lignes'] as ApiRow[])
           : [];
         if (this.canEditSelectedSheet) {
-          const projects = await this.api.get<ApiRow[]>('/api/projets');
-          const taskLists = await Promise.all(
-            projects.map((project) =>
-              this.api
-                .get<ApiRow[]>(`/api/projets/${this.number(project, 'id')}/taches`)
-                .catch(() => []),
-            ),
-          );
-          this.taskOptions = taskLists.flat();
+          this.taskOptions = await this.api.get<ApiRow[]>('/api/mes-missions');
         } else {
           this.taskOptions = [];
         }
@@ -668,11 +694,12 @@ export class App implements OnInit {
   actionLabel(row: ApiRow): string {
     if (this.currentView === 'projects') return 'Détails / tâches';
     if (this.currentView === 'freelancers') return 'Modifier';
+    if (this.currentView === 'my-missions') return 'Consulter la mission';
     if (this.currentView === 'timesheets') {
       if (this.user?.role === 'FREELANCE' && ['BROUILLON', 'REJETEE'].includes(this.text(row, 'statut'))) {
         return 'Détails / saisir';
       }
-      if (this.text(row, 'statut') === 'SOUMISE' && this.user?.role !== 'FREELANCE') {
+      if (this.text(row, 'statut') === 'SOUMISE' && this.user?.role === 'CHEF_PROJET') {
         return 'Valider';
       }
       return 'Détails';
@@ -685,18 +712,57 @@ export class App implements OnInit {
     return '';
   }
 
+  canConfirmPayment(row: ApiRow): boolean {
+    return (
+      this.currentView === 'timesheets' &&
+      this.user?.role === 'CHEF_PROJET' &&
+      Boolean(this.number(row, 'paiementId')) &&
+      this.text(row, 'paiementStatut') !== 'PAYE'
+    );
+  }
+
+  async confirmTimesheetPayment(row: ApiRow): Promise<void> {
+    if (!this.canConfirmPayment(row)) return;
+    const values = await this.showActionDialog({
+      title: 'Confirmer le paiement',
+      description: `Confirmez le paiement de la feuille de ${this.text(row, 'freelanceNomComplet')} pour la semaine du ${this.formatDate(this.text(row, 'semaineDebut'))}.`,
+      submitLabel: 'Confirmer le paiement',
+      fields: [
+        { key: 'reference', label: 'Référence du paiement', type: 'text', hint: 'Facultatif' },
+      ],
+    });
+    if (!values) return;
+    try {
+      await this.api.patch(`/api/paiements/${this.number(row, 'paiementId')}`, {
+        statut: 'PAYE',
+        datePaiement: this.dateInputValue(new Date()),
+        reference: String(values['reference'] ?? '').trim() || null,
+      });
+      this.notify('Paiement confirmé.');
+      await this.loadView();
+    } catch (error: unknown) {
+      this.setError(error);
+    }
+  }
+
   async rowAction(row: ApiRow): Promise<void> {
     const id = this.number(row, 'id');
     try {
       if (this.currentView === 'projects') {
         await this.openDetails(row);
+      } else if (this.currentView === 'my-missions') {
+        await this.openDetails(row);
       } else if (this.currentView === 'freelancers') {
         const values = await this.showActionDialog({
           title: 'Modifier le profil freelance',
-          description: `Mettez à jour le TJM et la spécialité de ${this.text(row, 'nomComplet')}.`,
+          description: this.user?.role === 'ADMIN'
+            ? `Mettez à jour le TJM et la spécialité de ${this.text(row, 'nomComplet')}.`
+            : `Mettez à jour la spécialité de ${this.text(row, 'nomComplet')}.`,
           submitLabel: 'Enregistrer',
           fields: [
-            { key: 'tjm', label: 'TJM (MAD)', type: 'number', required: true, min: 0.01, step: 0.01 },
+            ...(this.user?.role === 'ADMIN'
+              ? [{ key: 'tjm', label: 'TJM (MAD)', type: 'number' as const, required: true, min: 0.01, step: 0.01 }]
+              : []),
             { key: 'specialite', label: 'Spécialité', type: 'text', required: true },
           ],
           values: {
@@ -706,14 +772,14 @@ export class App implements OnInit {
         });
         if (!values) return;
         await this.api.put(`/api/freelances/${id}`, {
-          tjm: Number(values['tjm']),
+          tjm: this.user?.role === 'ADMIN' ? Number(values['tjm']) : this.number(row, 'tjm'),
           specialite: String(values['specialite'] ?? ''),
           statut: this.text(row, 'statut'),
         });
         await this.loadView();
       } else if (this.currentView === 'timesheets') {
         const status = this.text(row, 'statut');
-        if (status === 'SOUMISE' && this.user?.role !== 'FREELANCE') {
+        if (status === 'SOUMISE' && this.user?.role === 'CHEF_PROJET') {
           const confirmed = await this.confirmAction(
             'Valider la feuille de temps ?',
             'Cette action validera la feuille et générera son procès-verbal de réception.',
@@ -947,6 +1013,138 @@ export class App implements OnInit {
     }
   }
 
+  async editProject(): Promise<void> {
+    if (!this.selectedProject || this.user?.role !== 'CHEF_PROJET') return;
+    try {
+      const project = await this.api.get<ApiRow>(
+        `/api/projets/${this.number(this.selectedProject, 'id')}`,
+      );
+      this.projectTypes = await this.api.get<ApiRow[]>('/api/projets/types');
+      const values = await this.showActionDialog({
+        title: 'Modifier le projet',
+        description: `Mettez à jour les informations de « ${this.text(project, 'nom')} ».`,
+        submitLabel: 'Enregistrer',
+        fields: [
+          { key: 'nom', label: 'Nom du projet', type: 'text', required: true },
+          { key: 'description', label: 'Description', type: 'textarea' },
+          { key: 'budget', label: 'Budget (MAD)', type: 'number', required: true, min: 1, step: 0.01 },
+          { key: 'dateDebut', label: 'Date de début', type: 'date', required: true },
+          { key: 'dateFinPrevue', label: 'Date de fin prévue', type: 'date', required: true },
+          {
+            key: 'typeProjetId',
+            label: 'Type de projet',
+            type: 'select',
+            required: true,
+            options: this.projectTypes.map((type) => ({
+              value: this.number(type, 'id'),
+              label: this.text(type, 'libelle'),
+            })),
+          },
+          {
+            key: 'statut',
+            label: 'Statut',
+            type: 'select',
+            required: true,
+            options: [
+              { value: 'PLANIFIE', label: 'Planifié' },
+              { value: 'EN_COURS', label: 'En cours' },
+              { value: 'SUSPENDU', label: 'Suspendu' },
+              { value: 'TERMINE', label: 'Terminé' },
+            ],
+          },
+        ],
+        values: {
+          nom: this.text(project, 'nom'),
+          description: this.text(project, 'description'),
+          budget: this.number(project, 'budget'),
+          dateDebut: this.text(project, 'dateDebut'),
+          dateFinPrevue: this.text(project, 'dateFinPrevue'),
+          typeProjetId: this.number(project, 'typeProjetId'),
+          statut: this.text(project, 'statut'),
+        },
+      });
+      if (!values) return;
+      const updated = await this.api.put<ApiRow>(
+        `/api/projets/${this.number(project, 'id')}`,
+        {
+          nom: String(values['nom'] ?? '').trim(),
+          description: values['description'] ?? '',
+          budget: Number(values['budget']),
+          dateDebut: values['dateDebut'],
+          dateFinPrevue: values['dateFinPrevue'],
+          typeProjetId: Number(values['typeProjetId']),
+          statut: values['statut'],
+        },
+      );
+      this.selectedProject = updated;
+      this.detailTitle = `${this.text(updated, 'nom')} — tâches`;
+      this.notify('Projet modifié.');
+      await this.loadView();
+    } catch (error: unknown) {
+      this.setError(error);
+    }
+  }
+
+  async editTask(row: ApiRow): Promise<void> {
+    if (!this.selectedProject || this.user?.role !== 'CHEF_PROJET') return;
+    const values = await this.showActionDialog({
+      title: 'Modifier la tâche',
+      description: `Mettez à jour « ${this.text(row, 'titre')} ».`,
+      submitLabel: 'Enregistrer',
+      fields: [
+        { key: 'titre', label: 'Intitulé de la tâche', type: 'text', required: true },
+        { key: 'chargeEstimee', label: 'Charge estimée (jours)', type: 'number', required: true, min: 0, step: 0.25 },
+        { key: 'avancement', label: 'Avancement (%)', type: 'number', required: true, min: 0, max: 100, step: 1 },
+        {
+          key: 'statut',
+          label: 'Statut',
+          type: 'select',
+          required: true,
+          options: [
+            { value: 'A_FAIRE', label: 'À faire' },
+            { value: 'EN_COURS', label: 'En cours' },
+            { value: 'TERMINEE', label: 'Terminée' },
+          ],
+        },
+        { key: 'dateDebut', label: 'Date de début', type: 'date' },
+        { key: 'dateFin', label: 'Date de fin', type: 'date' },
+      ],
+      values: {
+        titre: this.text(row, 'titre'),
+        chargeEstimee: this.number(row, 'chargeEstimee'),
+        avancement: this.number(row, 'avancement'),
+        statut: this.text(row, 'statut'),
+        dateDebut: this.text(row, 'dateDebut'),
+        dateFin: this.text(row, 'dateFin'),
+      },
+    });
+    if (!values) return;
+    try {
+      const progress = Number(values['avancement']);
+      const status = String(values['statut'] ?? '');
+      const matchesStatus =
+        (status === 'A_FAIRE' && progress === 0) ||
+        (status === 'EN_COURS' && progress > 0 && progress < 100) ||
+        (status === 'TERMINEE' && progress === 100);
+      if (!Number.isInteger(progress) || !matchesStatus) {
+        throw new Error('Le statut de la tâche doit correspondre à son pourcentage d’avancement.');
+      }
+      await this.api.put(`/api/taches/${this.number(row, 'id')}`, {
+        titre: String(values['titre'] ?? '').trim(),
+        chargeEstimee: Number(values['chargeEstimee']),
+        avancement: progress,
+        statut: status,
+        affectationId: this.number(row, 'affectationId') || null,
+        dateDebut: values['dateDebut'] || null,
+        dateFin: values['dateFin'] || null,
+      });
+      await this.openDetails(this.selectedProject);
+      this.notify('Tâche modifiée.');
+    } catch (error: unknown) {
+      this.setError(error);
+    }
+  }
+
   async createTask(): Promise<void> {
     if (!this.selectedProject) return;
     const fields = [
@@ -1138,6 +1336,7 @@ export class App implements OnInit {
       dashboard: '⌂',
       projects: '▦',
       freelancers: '♙',
+      'my-missions': '✓',
       timesheets: '◷',
       billing: '▤',
       'my-pvs': '▤',

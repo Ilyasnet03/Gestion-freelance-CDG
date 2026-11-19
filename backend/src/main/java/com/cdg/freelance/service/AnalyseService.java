@@ -10,6 +10,7 @@ import com.cdg.freelance.repository.ParametreRepository;
 import com.cdg.freelance.repository.ProjetRepository;
 import com.cdg.freelance.repository.TimesheetRepository;
 import com.cdg.freelance.security.UserPrincipal;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,7 +58,23 @@ public class AnalyseService {
 
     @Transactional
     public Map<String, Object> runDailyAnalysis() {
-        List<Projet> projets = projetRepository.findAll();
+        return runDailyAnalysisForProjects(projetRepository.findAll());
+    }
+
+    @Transactional
+    public Map<String, Object> runDailyAnalysis(UserPrincipal currentUser) {
+        List<Projet> projets;
+        if (currentUser.getRole() == Role.ADMIN) {
+            projets = projetRepository.findAll();
+        } else if (currentUser.getRole() == Role.CHEF_PROJET) {
+            projets = projetRepository.findAllByChefProjetId(currentUser.getId());
+        } else {
+            throw new AccessDeniedException("Seuls les chefs de projet et administrateurs peuvent lancer les analyses");
+        }
+        return runDailyAnalysisForProjects(projets);
+    }
+
+    private Map<String, Object> runDailyAnalysisForProjects(List<Projet> projets) {
 
         int attentionBudget = readThreshold("SEUIL_BUDGET_ATTENTION", 80);
         int criticalBudget = readThreshold("SEUIL_BUDGET_CRITIQUE", 100);

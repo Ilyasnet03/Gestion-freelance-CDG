@@ -90,11 +90,21 @@ public class FreelanceService {
     }
 
     @Transactional
-    public FreelanceDto updateFreelance(Long id, UpdateFreelanceRequest req) {
+    public FreelanceDto updateFreelance(Long id, UpdateFreelanceRequest req, UserPrincipal currentUser) {
+        if (currentUser.getRole() != Role.ADMIN && currentUser.getRole() != Role.CHEF_PROJET) {
+            throw new AccessDeniedException("Seuls les chefs de projet et administrateurs peuvent gérer les fiches freelance");
+        }
         Freelance f = freelanceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Freelance non trouvé avec l'id : " + id));
 
-        f.setTjm(req.getTjm());
+        if (currentUser.getRole() == Role.CHEF_PROJET
+                && req.getTjm() != null
+                && f.getTjm().compareTo(req.getTjm()) != 0) {
+            throw new AccessDeniedException("Seul un administrateur peut modifier le TJM de référence");
+        }
+        if (currentUser.getRole() == Role.ADMIN) {
+            f.setTjm(req.getTjm());
+        }
         if (req.getSpecialite() != null) {
             f.setSpecialite(req.getSpecialite());
         }

@@ -10,4 +10,5 @@ import java.util.List;
 public interface TacheRepository extends JpaRepository<Tache, Long> {
     List<Tache> findAllByProjetId(Long projetId);
     List<Tache> findAllByAffectationId(Long affectationId);
+    List<Tache> findAllByAffectationFreelanceId(Long freelanceId);
 }

@@ -29,8 +29,8 @@ public class AnalyseProxyController {
 
     @PostMapping("/executer")
     @Operation(summary = "Déclencher immédiatement l'analyse des budgets, retards et feuilles de temps")
-    public ResponseEntity<Map<String, Object>> executeAnalyses() {
-        return ResponseEntity.ok(analyseService.runDailyAnalysis());
+    public ResponseEntity<Map<String, Object>> executeAnalyses(@AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(analyseService.runDailyAnalysis(principal));
     }
 
     @GetMapping("/rapport-mensuel")

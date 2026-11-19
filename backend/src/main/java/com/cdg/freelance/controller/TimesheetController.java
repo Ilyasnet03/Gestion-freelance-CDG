@@ -83,7 +83,7 @@ public class TimesheetController {
     }
 
     @PostMapping("/{id}/valider")
-    @PreAuthorize("hasAnyRole('CHEF_PROJET', 'ADMIN')")
+    @PreAuthorize("hasRole('CHEF_PROJET')")
     @Operation(summary = "Valider la timesheet et générer automatiquement le PV de réception en PDF")
     public ResponseEntity<TimesheetDto> valider(
             @PathVariable Long id,
@@ -92,7 +92,7 @@ public class TimesheetController {
     }
 
     @PostMapping("/{id}/rejeter")
-    @PreAuthorize("hasAnyRole('CHEF_PROJET', 'ADMIN')")
+    @PreAuthorize("hasRole('CHEF_PROJET')")
     @Operation(summary = "Rejeter la timesheet avec motif obligatoire (SOUMISE -> REJETEE)")
     public ResponseEntity<TimesheetDto> rejeter(
             @PathVariable Long id,

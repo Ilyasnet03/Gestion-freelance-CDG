@@ -5,6 +5,7 @@ import com.cdg.freelance.dto.tache.TacheDto;
 import com.cdg.freelance.dto.tache.UpdateAvancementRequest;
 import com.cdg.freelance.dto.tache.UpdateTacheRequest;
 import com.cdg.freelance.entity.Affectation;
+import com.cdg.freelance.entity.Freelance;
 import com.cdg.freelance.entity.Projet;
 import com.cdg.freelance.entity.Role;
 import com.cdg.freelance.entity.Tache;
@@ -13,6 +14,7 @@ import com.cdg.freelance.exception.BusinessException;
 import com.cdg.freelance.exception.ResourceNotFoundException;
 import com.cdg.freelance.mapper.EntityMapper;
 import com.cdg.freelance.repository.AffectationRepository;
+import com.cdg.freelance.repository.FreelanceRepository;
 import com.cdg.freelance.repository.ProjetRepository;
 import com.cdg.freelance.repository.TacheRepository;
 import com.cdg.freelance.security.UserPrincipal;
@@ -29,16 +31,31 @@ public class TacheService {
     private final TacheRepository tacheRepository;
     private final ProjetRepository projetRepository;
     private final AffectationRepository affectationRepository;
+    private final FreelanceRepository freelanceRepository;
     private final EntityMapper mapper;
 
     public TacheService(TacheRepository tacheRepository,
                         ProjetRepository projetRepository,
                         AffectationRepository affectationRepository,
+                        FreelanceRepository freelanceRepository,
                         EntityMapper mapper) {
         this.tacheRepository = tacheRepository;
         this.projetRepository = projetRepository;
         this.affectationRepository = affectationRepository;
+        this.freelanceRepository = freelanceRepository;
         this.mapper = mapper;
+    }
+
+    @Transactional(readOnly = true)
+    public List<TacheDto> listMesMissions(UserPrincipal currentUser) {
+        if (currentUser.getRole() != Role.FREELANCE) {
+            throw new AccessDeniedException("Cette liste est réservée au freelance connecté");
+        }
+        Freelance freelance = freelanceRepository.findByUtilisateurId(currentUser.getId())
+                .orElseThrow(() -> new BusinessException("Aucun profil freelance n'est associé à votre compte"));
+        return tacheRepository.findAllByAffectationFreelanceId(freelance.getId()).stream()
+                .map(mapper::toTacheDto)
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -121,12 +138,11 @@ public class TacheService {
         Tache t = tacheRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Tâche non trouvée avec l'id : " + id));
 
-        if (currentUser.getRole() == Role.FREELANCE
-                && (t.getAffectation() == null
-                || t.getAffectation().getFreelance() == null
-                || t.getAffectation().getFreelance().getUtilisateur() == null
-                || !t.getAffectation().getFreelance().getUtilisateur().getId().equals(currentUser.getId()))) {
-            throw new AccessDeniedException("Vous ne pouvez modifier que l'avancement de vos propres tâches");
+        if (currentUser.getRole() != Role.CHEF_PROJET
+                || t.getProjet() == null
+                || t.getProjet().getChefProjet() == null
+                || !t.getProjet().getChefProjet().getId().equals(currentUser.getId())) {
+            throw new AccessDeniedException("Seul le chef de projet concerné peut modifier l'avancement de cette tâche");
         }
 
         t.setAvancement(req.getAvancement());
