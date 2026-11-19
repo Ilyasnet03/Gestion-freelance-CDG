@@ -1,0 +1,880 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10233f">
+  <title>CDG | Gestion des freelances</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --color-primary: #00843d;
+      --color-primary-dark: #006b31;
+      --color-grey-900: #2b2b2b;
+      --color-grey-600: #6b6b6b;
+      --color-grey-200: #e3e3e3;
+      --color-grey-50: #f5f5f5;
+      --color-white: #fff;
+      --status-success: #2e7d32;
+      --status-warning: #ed8f00;
+      --status-critical: #c62828;
+      --status-info: #1565c0;
+      --navy: var(--color-grey-900);
+      --navy-soft: var(--color-grey-50);
+      --teal: var(--color-primary);
+      --teal-light: #edf5ef;
+      --ink: var(--color-grey-900);
+      --muted: var(--color-grey-600);
+      --line: var(--color-grey-200);
+      --surface: var(--color-white);
+      --bg: var(--color-grey-50);
+      --red: var(--status-critical);
+      --green: var(--status-success);
+      --shadow: 0 1px 3px rgba(0, 0, 0, .08);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 "Open Sans", Roboto, "Segoe UI", Arial, sans-serif; }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    a { color: var(--color-primary); }
+    :focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
+    .skip-link { position: fixed; top: 8px; left: 8px; z-index: 20; padding: 10px 14px; color: #fff; background: var(--color-grey-900); transform: translateY(-160%); }
+    .skip-link:focus { transform: translateY(0); }
+    .login-screen { min-height: 100vh; background: #fff; }
+    .login-topline { height: 40px; background: #e2e3e6; }
+    .login-header { height: 135px; background: #fff; }
+    .login-header-inner { width: min(1120px, calc(100% - 48px)); height: 100%; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; }
+    .brand-badge { width: 180px; height: 76px; overflow: hidden; }
+    .brand-badge img { display: block; width: 180px; height: auto; object-fit: contain; object-position: top; }
+    .login-header-link { color: #53626b; font-size: 15px; }
+    .login-banner { position: relative; height: 170px; overflow: hidden; color: white; background: #65737a; }
+    .login-banner::after { content: ""; position: absolute; width: 480px; height: 170px; right: 4%; top: 50px; border-top: 1px solid rgba(255, 255, 255, .1); transform: rotate(-23deg); }
+    .login-banner-inner { position: relative; z-index: 1; width: min(1120px, calc(100% - 48px)); height: 100%; margin: 0 auto; display: flex; flex-direction: column; justify-content: center; }
+    .login-breadcrumb { margin-bottom: 24px; color: rgba(255, 255, 255, .9); font-size: 14px; }
+    .login-banner h1 { margin: 0; font-size: 36px; font-weight: 700; letter-spacing: -.5px; }
+    .login-content { width: min(560px, calc(100% - 48px)); margin: 0 auto; padding: 84px 0 64px; }
+    .login-card { width: 100%; margin: 0; padding: 0; border: 0; border-radius: 0; background: #fff; box-shadow: none; }
+    .login-card h2 { margin: 0 0 7px; color: #243746; font-size: 25px; letter-spacing: -.4px; }
+    .login-card-subtitle { margin-bottom: 30px; color: #6f7a80; font-size: 14px; }
+    .subtle { color: var(--muted); }
+    .login-fields { display: grid; gap: 27px; margin-top: 0; }
+    .login-field { display: grid; gap: 8px; }
+    .login-field label { color: #283b47; font-weight: 400; font-size: 15px; }
+    .login-input-wrap { position: relative; }
+    .login-input-wrap > svg:not(#passwordEye) { display: none; }
+    .login-field input { width: 100%; height: 52px; padding: 0 48px 0 13px; border: 1px solid #cdd1d3; border-radius: 0; color: var(--ink); background: #fff; outline: none; transition: border-color .18s ease, box-shadow .18s ease; }
+    .login-field input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 2px rgba(0, 132, 61, .14); }
+    .password-toggle { position: absolute; right: 7px; top: 50%; width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border: 0; border-radius: 0; color: #728087; background: transparent; transform: translateY(-50%); }
+    .password-toggle:hover { color: var(--teal); background: #f3f6f2; }
+    .password-toggle svg { position: static; width: 18px; height: 18px; transform: none; }
+    .login-options { display: flex; align-items: center; justify-content: space-between; margin: 17px 0 20px; }
+    .remember-option { display: inline-flex; align-items: center; gap: 8px; color: #53626b; font-size: 13px; cursor: pointer; }
+    .remember-option input { width: 16px; height: 16px; accent-color: var(--color-primary); }
+    .login-card .btn.full { height: 50px; padding: 0 18px; border-radius: 4px; background: var(--color-primary); box-shadow: none; font-size: 15px; transition: background .18s ease; }
+    .login-card .btn.full:hover { filter: none; background: var(--color-primary-dark); box-shadow: none; transform: none; }
+    .login-card .btn.full:active { background: var(--color-primary-dark); }
+    .login-card .error { min-height: 18px; margin: 12px 0 0; padding: 0 2px; }
+    .login-card .error:not(:empty) { margin-bottom: 10px; color: #a52d3e; }
+    .demo-note { margin-top: 18px; padding: 0; border: 0; border-radius: 0; background: transparent; color: #748087; text-align: left; font-size: 12px; }
+    .brand-mark { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 16px; background: #e1f4ef; color: var(--teal); font-weight: 800; font-size: 19px; letter-spacing: -1px; }
+    .field { display: grid; gap: 6px; margin: 15px 0; }
+    .field label { color: var(--color-grey-900); font-weight: 600; font-size: 14px; }
+    .field input, .field select { width: 100%; min-height: 42px; padding: 9px 12px; border: 1px solid var(--color-grey-200); border-radius: 4px; color: var(--ink); background: var(--color-white); outline: none; }
+    .field input:focus, .field select:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(0, 132, 61, .15); }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 13px; border: 1px solid transparent; border-radius: 4px; color: white; background: var(--color-primary); font-weight: 600; transition: background-color .15s ease, border-color .15s ease; }
+    .btn:hover { background: var(--color-primary-dark); }
+    .btn:disabled { opacity: .55; cursor: wait; transform: none; }
+    .btn.full { width: 100%; padding: 12px; margin-top: 7px; }
+    .btn.secondary { color: var(--color-primary); border-color: var(--color-primary); background: transparent; }
+    .btn.secondary:hover { color: var(--color-primary-dark); border-color: var(--color-primary-dark); background: #f3f8f4; }
+    .btn.danger { color: #fff; background: var(--status-critical); }
+    .btn.success { color: #fff; background: var(--status-success); }
+    .btn.small { padding: 6px 9px; font-size: 12px; }
+    .shell { display: none; min-height: 100vh; }
+    .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 3; width: 250px; display: flex; flex-direction: column; padding: 24px 16px; color: var(--color-grey-900); background: var(--color-white); border-right: 1px solid var(--color-grey-200); }
+    .side-brand { display: flex; align-items: center; gap: 12px; padding: 0 10px 24px; color: var(--color-grey-900); font-weight: 700; font-size: 15px; }
+    .side-brand .brand-mark { width: 38px; height: 38px; border: 1px solid var(--color-grey-200); border-radius: 4px; background: var(--color-white); color: var(--color-primary); font-size: 14px; }
+    .nav-label { padding: 14px 11px 7px; color: var(--color-grey-600); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    .nav-btn { width: 100%; display: flex; align-items: center; gap: 11px; margin: 2px 0; padding: 10px 12px; border: 0; border-left: 3px solid transparent; border-radius: 0 4px 4px 0; color: var(--color-grey-600); background: transparent; text-align: left; }
+    .nav-btn:hover { color: var(--color-primary-dark); background: var(--color-grey-50); }
+    .nav-btn.active { color: var(--color-primary-dark); border-left-color: var(--color-primary); background: #edf5ef; font-weight: 600; }
+    .nav-icon { width: 19px; color: inherit; text-align: center; font-size: 16px; }
+    .sidebar-bottom { margin-top: auto; padding: 14px 10px 2px; border-top: 1px solid var(--color-grey-200); }
+    .user-mini { overflow: hidden; color: var(--color-grey-900); font-weight: 600; white-space: nowrap; text-overflow: ellipsis; }
+    .user-role { margin: 3px 0 10px; color: var(--color-grey-600); font-size: 14px; }
+    .main { min-height: 100vh; margin-left: 250px; background: var(--color-grey-50); }
+    .topbar { position: sticky; top: 0; z-index: 2; min-height: 76px; display: flex; align-items: center; justify-content: space-between; padding: 0 32px; border-bottom: 1px solid var(--color-grey-200); background: var(--color-white); }
+    .topbar h1 { margin: 0; color: var(--color-grey-900); font-size: 28px; font-weight: 700; letter-spacing: -.3px; }
+    .topbar-right { display: flex; align-items: center; gap: 10px; }
+    .avatar { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid #cfe2d4; border-radius: 50%; color: var(--color-primary-dark); background: #edf5ef; font-weight: 700; }
+    .content { max-width: 1140px; margin: 0 auto; padding: 32px 24px 64px; }
+    .welcome { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: 23px; }
+    .welcome h2 { margin: 0; color: var(--color-grey-900); font-size: 24px; font-weight: 600; letter-spacing: -.4px; }
+    .welcome h2::after, .card-heading h3::after { content: ""; width: 40px; height: 3px; display: block; margin-top: 9px; background: var(--color-primary); }
+    .welcome p { margin: 7px 0 0; color: var(--muted); font-size: 16px; }
+    .grid { display: grid; gap: 16px; }
+    .kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 20px; }
+    .card { min-width: 0; padding: 20px; border: 1px solid var(--color-grey-200); border-radius: 4px; background: var(--color-white); box-shadow: var(--shadow); }
+    .kpi { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .kpi-grid > .card { border-left: 3px solid var(--color-primary); }
+    .kpi-label { color: var(--color-grey-600); font-size: 14px; font-weight: 600; }
+    .kpi-value { margin-top: 7px; color: var(--color-grey-900); font-size: 28px; font-weight: 700; letter-spacing: -.5px; }
+    .kpi-icon { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid var(--color-grey-200); border-radius: 4px; color: var(--color-primary); background: var(--color-white); font-size: 17px; }
+    .dashboard-grid { grid-template-columns: minmax(0, 1.45fr) minmax(270px, .75fr); align-items: start; }
+    .card-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .card-heading h3 { margin: 0; color: var(--color-grey-900); font-size: 20px; font-weight: 600; }
+    .card-heading p { margin: 3px 0 0; color: var(--muted); font-size: 14px; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th { padding: 12px; color: var(--color-grey-900); background: var(--color-grey-50); font-size: 13px; font-weight: 700; white-space: nowrap; }
+    td { padding: 12px; border-top: 1px solid var(--color-grey-200); color: var(--color-grey-900); font-size: 14px; vertical-align: middle; }
+    tbody tr:hover { background: #fafafa; }
+    td strong { color: var(--color-grey-900); font-size: 14px; }
+    .badge { display: inline-flex; align-items: center; padding: 4px 9px; border-radius: 20px; color: #484848; background: #ededed; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .badge.green { color: #1b5e20; background: #e8f5e9; }
+    .badge.orange { color: #704300; background: #fff3dc; }
+    .badge.red { color: #8e1c1c; background: #ffebee; }
+    .badge.blue { color: #0d47a1; background: #e3f2fd; }
+    .progress { width: 100px; height: 6px; overflow: hidden; border-radius: 10px; background: #e9e9e9; }
+    .progress span { height: 100%; display: block; border-radius: inherit; background: var(--color-primary); }
+    .alert-item { padding: 14px 0; border-top: 1px solid var(--color-grey-200); }
+    .alert-item:first-of-type { border-top: 0; padding-top: 2px; }
+    .alert-item strong { display: block; margin-bottom: 4px; font-size: 14px; }
+    .alert-item p { margin: 0; color: var(--color-grey-600); font-size: 14px; }
+    .empty { padding: 26px 12px; color: var(--muted); text-align: center; }
+    .empty strong { display: block; margin-bottom: 5px; color: #45596f; }
+    .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+    .toolbar h2 { margin: 0; color: var(--color-grey-900); font-size: 24px; font-weight: 600; }
+    .toolbar h2::after { content: ""; width: 40px; height: 3px; display: block; margin-top: 9px; background: var(--color-primary); }
+    .toolbar .hint { margin-top: 5px; color: var(--color-grey-600); font-size: 14px; }
+    .split { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(280px, .9fr); gap: 20px; align-items: start; }
+    .form-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .table-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+    .muted { color: var(--muted); }
+    .error { margin: 12px 0 0; color: var(--status-critical); font-size: 14px; }
+    .notice { margin-bottom: 14px; padding: 12px 14px; border: 1px solid #edc17a; border-radius: 4px; color: #704300; background: #fff8e9; font-size: 14px; }
+    .toast { position: fixed; right: 24px; bottom: 24px; z-index: 10; max-width: 380px; padding: 12px 16px; border: 1px solid var(--color-grey-200); border-left: 3px solid var(--color-primary); border-radius: 4px; color: var(--color-grey-900); background: #fff; box-shadow: var(--shadow); opacity: 0; pointer-events: none; transition: opacity .2s ease; }
+    .toast.show { opacity: 1; }
+    .app-footer { max-width: 1140px; margin: 0 auto; padding: 22px 24px 28px; border-top: 1px solid var(--color-grey-200); color: var(--color-grey-600); font-size: 14px; }
+    .app-footer-inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+    .app-footer strong { color: var(--color-grey-900); font-weight: 600; }
+    .mobile-menu { display: none; }
+    @media (max-width: 1000px) {
+      .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .dashboard-grid, .split { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 700px) {
+      .login-topline { height: 28px; }
+      .login-header { height: 96px; }
+      .login-header-inner, .login-banner-inner { width: calc(100% - 36px); }
+      .brand-badge { width: 146px; height: 62px; }
+      .brand-badge img { width: 146px; }
+      .login-banner { height: 150px; }
+      .login-banner h1 { font-size: 30px; }
+      .login-breadcrumb { margin-bottom: 17px; font-size: 13px; }
+      .login-content { width: calc(100% - 40px); padding: 48px 0 40px; }
+      .login-fields { gap: 22px; }
+      .login-card-subtitle { margin-bottom: 24px; }
+      .sidebar { width: 248px; transform: translateX(-100%); transition: transform .2s ease; box-shadow: var(--shadow); }
+      .sidebar.open { transform: translateX(0); }
+      .main { margin-left: 0; }
+      .topbar { height: 60px; padding: 0 16px; }
+      .mobile-menu { display: inline-flex; margin-right: 10px; }
+      .content { padding: 20px 15px 36px; }
+      .topbar h1 { margin-right: auto; font-size: 16px; }
+      .topbar-right .top-name { display: none; }
+      .welcome { align-items: flex-start; flex-direction: column; }
+      .form-row { grid-template-columns: 1fr; }
+      .kpi-grid { gap: 10px; }
+      .card { padding: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <section class="login-screen" id="loginScreen">
+    <div class="login-topline"></div>
+    <header class="login-header">
+      <div class="login-header-inner">
+        <div class="brand-badge">
+          <img src="/cdg.logo.png?v=3" alt="CDG">
+        </div>
+        <span class="login-header-link">Le Groupe</span>
+      </div>
+    </header>
+    <div class="login-banner">
+      <div class="login-banner-inner">
+        <div class="login-breadcrumb">Accueil &gt; Espace de gestion</div>
+        <h1>Connexion</h1>
+      </div>
+    </div>
+    <main class="login-content">
+      <form class="login-card" id="loginForm">
+        <h2>Connectez-vous</h2>
+        <div class="login-card-subtitle">Accédez à votre espace de gestion CDG.</div>
+        <div class="login-fields">
+          <div class="login-field">
+            <label for="email">Adresse e-mail</label>
+            <div class="login-input-wrap">
+              <input id="email" name="email" type="email" autocomplete="username" value="admin@cdg.ma" required>
+            </div>
+          </div>
+          <div class="login-field">
+            <label for="password">Mot de passe</label>
+            <div class="login-input-wrap">
+              <input id="password" name="password" type="password" autocomplete="current-password" value="password123" required>
+              <button class="password-toggle" id="passwordToggle" type="button" aria-label="Afficher le mot de passe" aria-controls="password">
+                <svg id="passwordEye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="login-options">
+          <label class="remember-option"><input id="rememberEmail" type="checkbox"> Se souvenir de moi</label>
+        </div>
+        <button class="btn full" type="submit" id="loginButton"><span id="loginButtonLabel">Se connecter</span><span aria-hidden="true">→</span></button>
+        <div class="error" id="loginError" role="alert"></div>
+        <div class="demo-note">Compte de démonstration : <strong>admin@cdg.ma</strong> · <strong>password123</strong></div>
+      </form>
+    </main>
+  </section>
+
+  <div class="shell" id="appShell">
+    <aside class="sidebar" id="sidebar">
+      <div class="side-brand"><div class="brand-mark">CDG</div><span>Freelance<br>Management</span></div>
+      <div class="nav-label">Espace de travail</div>
+      <nav id="navigation">
+        <button class="nav-btn active" data-view="dashboard"><span class="nav-icon">⌂</span>Vue d'ensemble</button>
+        <button class="nav-btn" data-view="projects"><span class="nav-icon">▦</span>Projets</button>
+        <button class="nav-btn" data-view="freelancers" data-roles="ADMIN,CHEF_PROJET"><span class="nav-icon">♙</span>Freelances</button>
+        <button class="nav-btn" data-view="timesheets"><span class="nav-icon">◷</span>Feuilles de temps</button>
+        <button class="nav-btn" data-view="billing" data-roles="ADMIN,CHEF_PROJET"><span class="nav-icon">▤</span>Facturation</button>
+        <button class="nav-btn" data-view="my-pvs" data-roles="FREELANCE"><span class="nav-icon">▤</span>Mes PV</button>
+        <button class="nav-btn" data-view="analysis" data-roles="ADMIN,CHEF_PROJET"><span class="nav-icon">◉</span>Analyse & alertes</button>
+        <button class="nav-btn" data-view="users" data-roles="ADMIN"><span class="nav-icon">♙</span>Utilisateurs</button>
+        <button class="nav-btn" data-view="settings" data-roles="ADMIN"><span class="nav-icon">⚙</span>Paramètres</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="user-mini" id="sideUser"></div>
+        <div class="user-role" id="sideRole"></div>
+        <button class="nav-btn" id="logoutButton"><span class="nav-icon">↪</span>Déconnexion</button>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <button class="btn secondary small mobile-menu" id="menuButton" aria-label="Ouvrir le menu">☰</button>
+        <h1 id="pageTitle">Vue d'ensemble</h1>
+        <div class="topbar-right"><span class="top-name subtle" id="topUser"></span><span class="avatar" id="avatar"></span></div>
+      </header>
+      <div class="content" id="pageContent"></div>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+  <script>
+    (function () {
+      "use strict";
+      const $ = (selector, root = document) => root.querySelector(selector);
+      const state = { token: sessionStorage.getItem("cdg-token"), user: null, view: "dashboard", selectedSheet: null, cachedProjects: [] };
+      const titles = { dashboard: "Vue d'ensemble", projects: "Projets", freelancers: "Freelances", timesheets: "Feuilles de temps", billing: "Facturation", "my-pvs": "Mes PV de réception", analysis: "Analyse & alertes", users: "Utilisateurs", settings: "Paramètres" };
+
+      const rememberedEmail = localStorage.getItem("cdg-remembered-email");
+      if (rememberedEmail) {
+        $("#email").value = rememberedEmail;
+        $("#rememberEmail").checked = true;
+      }
+
+      $("#passwordToggle").addEventListener("click", () => {
+        const password = $("#password");
+        const showing = password.type === "text";
+        password.type = showing ? "password" : "text";
+        $("#passwordToggle").setAttribute("aria-label", showing ? "Afficher le mot de passe" : "Masquer le mot de passe");
+      });
+
+      function escapeHtml(value) {
+        return String(value == null ? "" : value).replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+      }
+      function money(value) {
+        return new Intl.NumberFormat("fr-MA", { style: "currency", currency: "MAD", maximumFractionDigits: 2 }).format(Number(value || 0));
+      }
+      function date(value) {
+        if (!value) return "—";
+        const parsed = new Date(value + (String(value).length === 10 ? "T00:00:00" : ""));
+        return Number.isNaN(parsed.getTime()) ? escapeHtml(value) : parsed.toLocaleDateString("fr-FR");
+      }
+      function roleName(role) {
+        return ({ ADMIN: "Administrateur", CHEF_PROJET: "Chef de projet", FREELANCE: "Freelance" })[role] || role || "";
+      }
+      function badge(value) {
+        const text = value || "—";
+        const normalized = String(text).toUpperCase();
+        const kind = /VALIDEE|PAYE|ACTIF|EN_COURS/.test(normalized) ? "green" :
+          /SOUMISE|PLANIFIE|ATTENTION|BROUILLON|EN_ATTENTE/.test(normalized) ? "orange" :
+          /REJETEE|CRITIQUE|ANNULE|INACTIF/.test(normalized) ? "red" : "";
+        return '<span class="badge ' + kind + '">' + escapeHtml(String(text).replaceAll("_", " ")) + "</span>";
+      }
+      async function api(path, options = {}) {
+        const headers = new Headers(options.headers || {});
+        if (state.token) headers.set("Authorization", "Bearer " + state.token);
+        if (options.body && !(options.body instanceof FormData)) headers.set("Content-Type", "application/json");
+        const response = await fetch(path, { ...options, headers });
+        if (response.status === 401) {
+          signOut();
+          throw new Error("Votre session a expiré. Veuillez vous reconnecter.");
+        }
+        if (!response.ok) {
+          let message = "Erreur " + response.status;
+          try {
+            const body = await response.json();
+            message = body.message || body.error || message;
+            if (body.errors && Array.isArray(body.errors)) message = body.errors.map(item => item.defaultMessage || item.message).join(", ");
+          } catch (_) {
+            try { message = (await response.text()) || message; } catch (_) { /* réponse sans détail */ }
+          }
+          throw new Error(message);
+        }
+        if (response.status === 204) return null;
+        const type = response.headers.get("content-type") || "";
+        return type.includes("application/pdf") ? response.blob() : response.json();
+      }
+      function toast(message) {
+        const node = $("#toast");
+        node.textContent = message;
+        node.classList.add("show");
+        window.setTimeout(() => node.classList.remove("show"), 3200);
+      }
+      function showError(container, error) {
+        const node = typeof container === "string" ? $(container) : container;
+        if (node) node.innerHTML = '<div class="error">' + escapeHtml(error.message || error) + "</div>";
+      }
+      function signOut() {
+        sessionStorage.removeItem("cdg-token");
+        state.token = null;
+        state.user = null;
+        $("#appShell").style.display = "none";
+        $("#loginScreen").style.display = "grid";
+      }
+      function showApp(user) {
+        state.user = user;
+        $("#loginScreen").style.display = "none";
+        $("#appShell").style.display = "block";
+        $("#sideUser").textContent = [user.prenom, user.nom].filter(Boolean).join(" ") || user.email;
+        $("#sideRole").textContent = roleName(user.role);
+        $("#topUser").textContent = user.prenom || user.email;
+        $("#avatar").textContent = ((user.prenom || "U")[0] + (user.nom || "")[0]).toUpperCase();
+        document.querySelectorAll(".nav-btn[data-roles]").forEach(button => {
+          button.hidden = !button.dataset.roles.split(",").includes(user.role);
+        });
+        navigate("dashboard");
+      }
+      async function navigate(view) {
+        state.view = view;
+        state.selectedSheet = null;
+        $("#pageTitle").textContent = titles[view] || titles.dashboard;
+        document.querySelectorAll(".nav-btn[data-view]").forEach(button => button.classList.toggle("active", button.dataset.view === view));
+        $("#sidebar").classList.remove("open");
+        $("#pageContent").innerHTML = '<div class="empty">Chargement…</div>';
+        try {
+          if (view === "dashboard") await renderDashboard();
+          else if (view === "projects") await renderProjects();
+          else if (view === "freelancers") await renderFreelancers();
+          else if (view === "timesheets") await renderTimesheets();
+          else if (view === "billing") await renderBilling();
+          else if (view === "my-pvs") await renderMyPvs();
+          else if (view === "analysis") await renderAnalysis();
+          else if (view === "users") await renderUsers();
+          else if (view === "settings") await renderSettings();
+        } catch (error) {
+          $("#pageContent").innerHTML = '<div class="card"><strong>Impossible de charger cette page</strong><div class="error">' + escapeHtml(error.message) + "</div></div>";
+        }
+      }
+      function progress(value) {
+        const number = Math.max(0, Math.min(100, Number(value || 0)));
+        return '<div class="progress" title="' + number + '%"><span style="width:' + number + '%"></span></div>';
+      }
+      function emptyRow(columns, message) {
+        return '<tr><td colspan="' + columns + '"><div class="empty">' + escapeHtml(message) + "</div></td></tr>";
+      }
+      async function renderDashboard() {
+        const data = await api("/api/dashboard/kpi");
+        const projects = await api("/api/projets");
+        state.cachedProjects = projects;
+        const alerts = data.dernieresAlertes || [];
+        $("#pageContent").innerHTML =
+          '<div class="welcome"><div><h2>Bonjour ' + escapeHtml(state.user.prenom || "et bienvenue") + ' 👋</h2><p>Voici les indicateurs de votre portefeuille CDG.</p></div><button class="btn secondary" data-action="refresh">↻ Actualiser</button></div>' +
+          '<div class="grid kpi-grid">' +
+            '<div class="card kpi"><div><div class="kpi-label">Projets actifs</div><div class="kpi-value">' + (data.projetsActifsCount || 0) + '</div></div><div class="kpi-icon">▦</div></div>' +
+            '<div class="card kpi"><div><div class="kpi-label">Budget global</div><div class="kpi-value">' + money(data.budgetGlobalTotal) + '</div></div><div class="kpi-icon">◈</div></div>' +
+            '<div class="card kpi"><div><div class="kpi-label">Budget consommé</div><div class="kpi-value">' + money(data.budgetConsommeTotal) + '</div></div><div class="kpi-icon">↗</div></div>' +
+            '<div class="card kpi"><div><div class="kpi-label">Timesheets à valider</div><div class="kpi-value">' + (data.timesheetsAValiderCount || 0) + '</div></div><div class="kpi-icon">◷</div></div>' +
+          '</div>' +
+          '<div class="grid dashboard-grid">' +
+            '<section class="card"><div class="card-heading"><div><h3>Projets</h3><p>Avancement et consommation budgétaire</p></div><button class="btn secondary small" data-nav="projects">Tout voir →</button></div>' +
+              '<div class="table-wrap"><table><thead><tr><th>Projet</th><th>Statut</th><th>Avancement</th><th>Consommation</th></tr></thead><tbody>' +
+                (projects.length ? projects.slice(0, 7).map(project => '<tr><td><strong>' + escapeHtml(project.nom) + '</strong><br><span class="muted">' + escapeHtml(project.code) + '</span></td><td>' + badge(project.statut) + '</td><td>' + progress(project.avancementGlobal) + '<span class="muted">' + (project.avancementGlobal || 0) + '%</span></td><td>' + money(project.budgetConsomme) + ' / ' + money(project.budget) + '</td></tr>').join("") : emptyRow(4, "Aucun projet accessible.")) +
+              '</tbody></table></div></section>' +
+            '<section class="card"><div class="card-heading"><div><h3>Alertes récentes</h3><p>' + (data.alertesCritiquesCount || 0) + ' critique(s) · ' + (data.alertesAttentionCount || 0) + ' à surveiller</p></div></div>' +
+              (alerts.length ? alerts.slice(0, 5).map(alert => '<div class="alert-item"><strong>' + badge(alert.niveau) + ' ' + escapeHtml(alert.projetNom || "Projet") + '</strong><p>' + escapeHtml(alert.message) + '</p><p class="muted">' + date(alert.dateCreation) + '</p></div>').join("") : '<div class="empty"><strong>Aucune alerte en attente</strong>Tout est à jour.</div>') +
+            '</section>' +
+          '</div>';
+      }
+      async function renderProjects() {
+        const projects = await api("/api/projets");
+        state.cachedProjects = projects;
+        const canManage = state.user.role === "ADMIN" || state.user.role === "CHEF_PROJET";
+        $("#pageContent").innerHTML = '<div class="toolbar"><div><h2>Portefeuille projets</h2><div class="hint">' + projects.length + ' projet(s) visibles selon vos droits.</div></div>' +
+          '<div class="table-actions">' + (canManage ? '<button class="btn" data-action="create-project">＋ Créer un projet</button>' : '') + '<button class="btn secondary" data-action="refresh">↻ Actualiser</button></div></div>' +
+          '<div id="projectCreateForm"></div><section class="card"><div class="table-wrap"><table><thead><tr><th>Projet</th><th>Chef de projet</th><th>Statut</th><th>Dates</th><th>Budget</th><th>Avancement</th><th></th></tr></thead><tbody>' +
+          (projects.length ? projects.map(project => '<tr><td><strong>' + escapeHtml(project.nom) + '</strong><br><span class="muted">' + escapeHtml(project.code) + '</span></td><td>' + escapeHtml(project.chefProjetNomComplet || "—") + '</td><td>' + badge(project.statut) + '</td><td>' + date(project.dateDebut) + ' → ' + date(project.dateFinPrevue) + '</td><td>' + money(project.budgetConsomme) + '<br><span class="muted">sur ' + money(project.budget) + '</span></td><td>' + progress(project.avancementGlobal) + '<span class="muted">' + (project.avancementGlobal || 0) + '%</span></td><td><button class="btn secondary small" data-action="project-tasks" data-id="' + project.id + '">Détails / tâches</button></td></tr>').join("") : emptyRow(7, "Aucun projet disponible.")) +
+          '</tbody></table></div></section><div id="projectTasks"></div>';
+      }
+      async function renderFreelancers() {
+        const freelancers = await api("/api/freelances");
+        state.freelancers = freelancers;
+        $("#pageContent").innerHTML = '<div class="toolbar"><div><h2>Répertoire des freelances</h2><div class="hint">' + freelancers.length + ' profil(s) enregistré(s).</div></div><button class="btn secondary" data-action="refresh">↻ Actualiser</button></div>' +
+          '<section class="card"><div class="table-wrap"><table><thead><tr><th>Freelance</th><th>Spécialité</th><th>TJM</th><th>Statut</th><th>E-mail</th><th></th></tr></thead><tbody>' +
+          (freelancers.length ? freelancers.map(person => '<tr><td><strong>' + escapeHtml(person.prenom + " " + person.nom) + '</strong></td><td>' + escapeHtml(person.specialite || "—") + '</td><td>' + money(person.tjm) + '</td><td>' + badge(person.statut) + '</td><td>' + escapeHtml(person.email) + '</td><td><button class="btn secondary small" data-action="edit-freelance" data-id="' + person.id + '">Modifier</button></td></tr>').join("") : emptyRow(6, "Aucun freelance enregistré.")) +
+          '</tbody></table></div></section><div id="freelanceEditor"></div>';
+      }
+      async function showProjectForm() {
+        const types = await api("/api/projets/types");
+        const chiefs = state.user.role === "ADMIN"
+          ? (await api("/api/admin/utilisateurs")).filter(user => user.role === "CHEF_PROJET" || user.role === "ADMIN")
+          : [state.user];
+        $("#projectCreateForm").innerHTML = '<section class="card" style="margin-bottom:16px"><div class="card-heading"><div><h3>Nouveau projet</h3></div><button class="btn secondary small" data-action="close-project-form">Fermer</button></div>' +
+          '<form id="projectForm"><div class="form-row"><div class="field"><label for="projectCode">Code</label><input id="projectCode" required></div>' +
+          '<div class="field"><label for="projectName">Nom</label><input id="projectName" required></div>' +
+          '<div class="field"><label for="projectBudget">Budget (MAD)</label><input id="projectBudget" type="number" min="1" step="0.01" required></div>' +
+          '<div class="field"><label for="projectStart">Date de début</label><input id="projectStart" type="date" required></div>' +
+          '<div class="field"><label for="projectEnd">Date de fin prévue</label><input id="projectEnd" type="date" required></div>' +
+          '<div class="field"><label for="projectType">Type</label><select id="projectType" required>' + types.map(type => '<option value="' + type.id + '">' + escapeHtml(type.libelle) + '</option>').join("") + '</select></div>' +
+          (state.user.role === "ADMIN" ? '<div class="field"><label for="projectChief">Chef de projet</label><select id="projectChief" required>' + chiefs.map(user => '<option value="' + user.id + '">' + escapeHtml(user.prenom + " " + user.nom + " (" + user.role + ")") + '</option>').join("") + '</select></div>' : '') +
+          '<div class="field"><label for="projectDescription">Description</label><input id="projectDescription"></div>' +
+          '<div class="field" style="align-self:end"><button class="btn" type="submit">Créer le projet</button></div></div><div id="projectFormError"></div></form></section>';
+      }
+      async function renderProjectDetails(id) {
+        const [project, tasks] = await Promise.all([
+          api("/api/projets/" + id),
+          api("/api/projets/" + id + "/taches")
+        ]);
+        const canManage = state.user.role === "ADMIN" || state.user.role === "CHEF_PROJET";
+        const [assignments, freelancers] = canManage
+          ? await Promise.all([api("/api/projets/" + id + "/affectations"), api("/api/freelances")])
+          : [[], []];
+        const target = $("#projectTasks");
+        target.innerHTML = '<section class="card" style="margin-top:16px"><div class="card-heading"><div><h3>' + escapeHtml(project.nom) + ' — tâches</h3><p>' + escapeHtml(project.code) + '</p></div><button class="btn secondary small" data-action="close-project-detail">Fermer</button></div>' +
+          (canManage ? '<div class="split" style="margin-bottom:14px"><form id="assignmentForm" data-project="' + id + '"><h3>Affecter un freelance</h3><div class="field"><label>Freelance</label><select id="assignmentFreelance" required>' + freelancers.map(person => '<option value="' + person.id + '" data-tjm="' + person.tjm + '">' + escapeHtml(person.prenom + " " + person.nom + " — " + person.specialite) + '</option>').join("") + '</select></div><div class="field"><label>TJM appliqué (MAD)</label><input id="assignmentTjm" type="number" min="0.01" step="0.01" value="' + (freelancers[0] ? freelancers[0].tjm : '') + '" required></div><div class="form-row"><div class="field"><label>Début</label><input id="assignmentStart" type="date" required></div><div class="field"><label>Fin</label><input id="assignmentEnd" type="date"></div></div><button class="btn small" type="submit">Affecter</button><div id="assignmentError"></div></form>' +
+          '<form id="taskForm" data-project="' + id + '"><h3>Créer une tâche</h3><div class="field"><label>Titre</label><input id="taskTitle" required></div><div class="form-row"><div class="field"><label>Charge estimée (jours)</label><input id="taskLoad" type="number" min="0" step="0.5" value="1" required></div><div class="field"><label>Affectation</label><select id="taskAssignment"><option value="">Non assignée</option>' + assignments.map(assignment => '<option value="' + assignment.id + '">' + escapeHtml(assignment.freelanceNomComplet + " — " + assignment.freelanceSpecialite) + '</option>').join("") + '</select></div></div><div class="form-row"><div class="field"><label>Début</label><input id="taskStart" type="date"></div><div class="field"><label>Fin</label><input id="taskEnd" type="date"></div></div><button class="btn small" type="submit">Créer la tâche</button><div id="taskFormError"></div></form></div>' : '') +
+          '<div class="table-wrap"><table><thead><tr><th>Tâche</th><th>Freelance</th><th>Statut</th><th>Avancement</th><th>Dates</th><th></th></tr></thead><tbody>' +
+          (tasks.length ? tasks.map(task => '<tr><td><strong>' + escapeHtml(task.titre) + '</strong></td><td>' + escapeHtml(task.freelanceNomComplet || "—") + '</td><td>' + badge(task.statut) + '</td><td>' + progress(task.avancement) + '<span class="muted">' + (task.avancement || 0) + '%</span></td><td>' + date(task.dateDebut) + ' → ' + date(task.dateFin) + '</td><td>' + (canManage ? '<button class="btn secondary small" data-action="update-task-progress" data-id="' + task.id + '" data-progress="' + (task.avancement || 0) + '">Modifier</button>' : '') + '</td></tr>').join("") : emptyRow(6, "Aucune tâche dans ce projet.")) +
+          '</tbody></table></div></section>';
+      }
+      async function tasksForProjects(projects) {
+        const results = await Promise.all(projects.map(project => api("/api/projets/" + project.id + "/taches").catch(() => [])));
+        return results.flat();
+      }
+      function sheetActions(sheet) {
+        if (state.user.role === "FREELANCE") {
+          if (sheet.statut === "BROUILLON" || sheet.statut === "REJETEE") return '<button class="btn secondary small" data-action="select-sheet" data-id="' + sheet.id + '">Détails / saisir</button><button class="btn small" data-action="submit-sheet" data-id="' + sheet.id + '">Soumettre</button>';
+          return '<button class="btn secondary small" data-action="select-sheet" data-id="' + sheet.id + '">Détails</button>';
+        }
+        if (sheet.statut === "SOUMISE" && state.user.role !== "FREELANCE") return '<button class="btn success small" data-action="approve-sheet" data-id="' + sheet.id + '">Valider</button><button class="btn danger small" data-action="reject-sheet" data-id="' + sheet.id + '">Rejeter</button>';
+        return '<button class="btn secondary small" data-action="select-sheet" data-id="' + sheet.id + '">Détails</button>';
+      }
+      async function renderTimesheets() {
+        const sheets = await api("/api/timesheets");
+        const freelancer = state.user.role === "FREELANCE";
+        $("#pageContent").innerHTML = '<div class="toolbar"><div><h2>Suivi des feuilles de temps</h2><div class="hint">' + (freelancer ? "Saisissez vos heures et soumettez-les à validation." : "Consultez et traitez les feuilles soumises.") + '</div></div>' +
+          (freelancer ? '<button class="btn" data-action="open-sheet">＋ Ouvrir une semaine</button>' : '<button class="btn secondary" data-action="refresh">↻ Actualiser</button>') + '</div>' +
+          (freelancer ? '<div id="newSheetForm"></div>' : '') +
+          '<section class="card"><div class="table-wrap"><table><thead><tr><th>Semaine du</th><th>Freelance</th><th>Projet</th><th>Heures</th><th>Statut</th><th></th></tr></thead><tbody>' +
+          (sheets.length ? sheets.map(sheet => '<tr><td><strong>' + date(sheet.semaineDebut) + '</strong></td><td>' + escapeHtml(sheet.freelanceNomComplet || "Moi") + '</td><td>' + escapeHtml(sheet.projetNom || "—") + '</td><td>' + Number(sheet.totalHeuresSemaine || 0).toFixed(2) + ' h</td><td>' + badge(sheet.statut) + (sheet.motifRejet ? '<br><span class="muted">' + escapeHtml(sheet.motifRejet) + '</span>' : '') + '</td><td><div class="table-actions">' + sheetActions(sheet) + '</div></td></tr>').join("") : emptyRow(6, freelancer ? "Aucune feuille de temps. Ouvrez une semaine pour commencer." : "Aucune feuille de temps à afficher.")) +
+          '</tbody></table></div></section><div id="sheetDetail"></div>';
+        state.sheets = sheets;
+      }
+      async function renderSheetDetail(id) {
+        const sheet = await api("/api/timesheets/" + id);
+        state.selectedSheet = sheet;
+        const editable = state.user.role === "FREELANCE" && (sheet.statut === "BROUILLON" || sheet.statut === "REJETEE");
+        let taskOptions = "";
+        if (editable) {
+          const projects = await api("/api/projets");
+          const tasks = await tasksForProjects(projects);
+          taskOptions = tasks.map(task => '<option value="' + task.id + '">' + escapeHtml(task.titre + " — " + (task.projetNom || "Projet")) + '</option>').join("");
+        }
+        const lines = sheet.lignes || [];
+        $("#sheetDetail").innerHTML = '<section class="card" style="margin-top:16px"><div class="card-heading"><div><h3>Détail — semaine du ' + date(sheet.semaineDebut) + '</h3><p>' + badge(sheet.statut) + ' · Total ' + Number(sheet.totalHeuresSemaine || 0).toFixed(2) + ' h</p></div><button class="btn secondary small" data-action="close-detail">Fermer</button></div>' +
+          (editable ? '<form id="lineForm"><div class="form-row"><div class="field"><label for="lineTask">Tâche</label><select id="lineTask" required>' + taskOptions + '</select></div><div class="field"><label for="lineDate">Date</label><input id="lineDate" type="date" min="' + escapeHtml(sheet.semaineDebut) + '" max="' + weekEnd(sheet.semaineDebut) + '" required></div><div class="field"><label for="lineHours">Heures</label><input id="lineHours" type="number" min="0.01" max="24" step="0.25" placeholder="7.5" required></div></div><button class="btn small" type="submit" ' + (taskOptions ? "" : "disabled") + '>＋ Ajouter les heures</button><span class="error" id="lineError"></span></form>' : '') +
+          '<div class="table-wrap" style="margin-top:14px"><table><thead><tr><th>Date</th><th>Projet</th><th>Tâche</th><th>Heures</th><th></th></tr></thead><tbody>' +
+          (lines.length ? lines.map(line => '<tr><td>' + date(line.dateSaisie) + '</td><td>' + escapeHtml(line.projetNom || "—") + '</td><td>' + escapeHtml(line.tacheTitre || "—") + '</td><td>' + Number(line.heures || 0).toFixed(2) + ' h</td><td>' + (editable ? '<button class="btn danger small" data-action="delete-line" data-id="' + sheet.id + '" data-line="' + line.id + '">Supprimer</button>' : '') + '</td></tr>').join("") : emptyRow(5, editable ? "Ajoutez les heures réalisées sur vos tâches." : "Aucune ligne de saisie.")) +
+          '</tbody></table></div></section>';
+        $("#lineDate").value = sheet.semaineDebut || "";
+      }
+      function weekEnd(monday) {
+        if (!monday) return "";
+        const result = new Date(monday + "T00:00:00");
+        result.setDate(result.getDate() + 6);
+        return result.toISOString().slice(0, 10);
+      }
+      function mondayOfCurrentWeek() {
+        const today = new Date();
+        const day = (today.getDay() + 6) % 7;
+        today.setDate(today.getDate() - day);
+        return today.toISOString().slice(0, 10);
+      }
+      async function renderBilling() {
+        const [pvs, payments] = await Promise.all([api("/api/pv"), api("/api/paiements")]);
+        $("#pageContent").innerHTML = '<div class="toolbar"><div><h2>Facturation & règlements</h2><div class="hint">Les PV sont générés après validation des feuilles de temps.</div></div><button class="btn secondary" data-action="refresh">↻ Actualiser</button></div>' +
+          '<section class="card" style="margin-bottom:16px"><div class="card-heading"><div><h3>Procès-verbaux de réception</h3><p>' + pvs.length + ' PV disponible(s).</p></div></div><div class="table-wrap"><table><thead><tr><th>Numéro</th><th>Freelance</th><th>Projet</th><th>Semaine</th><th>Montant</th><th></th></tr></thead><tbody>' +
+          (pvs.length ? pvs.map(pv => '<tr><td><strong>' + escapeHtml(pv.numero) + '</strong></td><td>' + escapeHtml(pv.freelanceNomComplet || "—") + '</td><td>' + escapeHtml(pv.projetNom || "—") + '</td><td>' + date(pv.semaineDebut) + '</td><td>' + money(pv.montant) + '</td><td><button class="btn secondary small" data-action="download-pv" data-id="' + pv.id + '">Télécharger PDF</button></td></tr>').join("") : emptyRow(6, "Aucun PV généré pour le moment.")) +
+          '</tbody></table></div></section><section class="card"><div class="card-heading"><div><h3>Suivi des paiements</h3><p>' + payments.length + ' paiement(s) enregistré(s).</p></div></div><div class="table-wrap"><table><thead><tr><th>Freelance</th><th>Projet</th><th>PV</th><th>Montant</th><th>Statut</th><th>Référence</th><th></th></tr></thead><tbody>' +
+          (payments.length ? payments.map(payment => '<tr><td>' + escapeHtml(payment.freelanceNomComplet || "—") + '</td><td>' + escapeHtml(payment.projetNom || "—") + '</td><td>' + escapeHtml(payment.numeroPv || "—") + '</td><td>' + money(payment.montant) + '</td><td>' + badge(payment.statut) + '</td><td>' + escapeHtml(payment.reference || "—") + '</td><td>' + (payment.statut !== "PAYE" ? '<button class="btn success small" data-action="mark-paid" data-id="' + payment.id + '">Marquer payé</button>' : date(payment.datePaiement)) + '</td></tr>').join("") : emptyRow(7, "Aucun paiement à afficher.")) +
+          '</tbody></table></div></section>';
+      }
+      async function renderMyPvs() {
+        const pvs = await api("/api/pv");
+        $("#pageContent").innerHTML = '<div class="toolbar"><div><h2>Mes procès-verbaux de réception</h2><div class="hint">Les PV sont créés après validation de vos feuilles de temps.</div></div><button class="btn secondary" data-action="refresh">↻ Actualiser</button></div>' +
+          '<section class="card"><div class="table-wrap"><table><thead><tr><th>Numéro</th><th>Projet</th><th>Semaine</th><th>Heures validées</th><th>Montant</th><th>Paiement</th><th></th></tr></thead><tbody>' +
+          (pvs.length ? pvs.map(pv => '<tr><td><strong>' + escapeHtml(pv.numero) + '</strong></td><td>' + escapeHtml(pv.projetNom || "—") + '</td><td>' + date(pv.semaineDebut) + '</td><td>' + Number(pv.totalHeures || 0).toFixed(2) + ' h</td><td>' + money(pv.montant) + '</td><td>' + badge(pv.paiementStatut || "EN_ATTENTE") + '</td><td><button class="btn secondary small" data-action="download-pv" data-id="' + pv.id + '">Télécharger PDF</button></td></tr>').join("") : emptyRow(7, "Aucun PV disponible. Il apparaîtra après la validation d'une timesheet.")) +
+          '</tbody></table></div></section>';
+      }
+      async function renderAnalysis() {
+        const alerts = await api("/api/alertes");
+        $("#pageContent").innerHTML = '<div class="toolbar"><div><h2>Analyses et alertes</h2><div class="hint">L’analyse automatique quotidienne surveille les budgets, retards et validations en attente.</div></div><button class="btn" data-action="run-analysis">▶ Exécuter maintenant</button></div>' +
+          '<section class="card" style="margin-bottom:16px"><div class="card-heading"><div><h3>Rapport analytique mensuel</h3><p>Générer le rapport PDF pour un mois donné.</p></div></div><form id="monthlyReportForm" class="form-row"><div class="field"><label for="reportMonth">Mois</label><input id="reportMonth" type="month" value="' + new Date().toISOString().slice(0, 7) + '" required></div><div class="field" style="align-self:end"><button class="btn" type="submit">Télécharger le rapport PDF</button></div></form></section>' +
+          '<section class="card"><div class="card-heading"><div><h3>Alertes de vos projets</h3><p>' + alerts.filter(alert => !alert.traitee).length + ' alerte(s) non traitée(s).</p></div><button class="btn secondary small" data-action="refresh">↻ Actualiser</button></div><div class="table-wrap"><table><thead><tr><th>Niveau</th><th>Projet</th><th>Type</th><th>Message</th><th>Date</th><th>État</th><th></th></tr></thead><tbody>' +
+          (alerts.length ? alerts.map(alert => '<tr><td>' + badge(alert.niveau) + '</td><td>' + escapeHtml(alert.projetNom || "—") + '</td><td>' + escapeHtml(String(alert.type || "").replaceAll("_", " ")) + '</td><td>' + escapeHtml(alert.message) + '</td><td>' + date(alert.dateCreation) + '</td><td>' + (alert.traitee ? badge("TRAITEE") : badge("A_TRAITER")) + '</td><td>' + (!alert.traitee ? '<button class="btn secondary small" data-action="resolve-alert" data-id="' + alert.id + '">Marquer traitée</button>' : '') + '</td></tr>').join("") : emptyRow(7, "Aucune alerte. Utilisez « Exécuter maintenant » pour lancer une analyse.")) +
+          '</tbody></table></div></section>';
+      }
+      async function renderUsers() {
+        const users = await api("/api/admin/utilisateurs");
+        state.users = users;
+        const editing = state.editingUser;
+        const roles = ["ADMIN", "CHEF_PROJET", "FREELANCE"];
+        $("#pageContent").innerHTML = '<div class="toolbar"><div><h2>Comptes utilisateurs</h2><div class="hint">Créer, modifier et désactiver les comptes de la plateforme.</div></div><button class="btn secondary" data-action="refresh">↻ Actualiser</button></div>' +
+          '<section class="card" style="margin-bottom:16px"><div class="card-heading"><div><h3>' + (editing ? "Modifier un compte" : "Créer un utilisateur") + '</h3><p>Les comptes FREELANCE reçoivent automatiquement une fiche freelance.</p></div>' + (editing ? '<button class="btn secondary small" data-action="cancel-user-edit">Annuler</button>' : '') + '</div>' +
+          '<form id="userForm" data-id="' + (editing ? editing.id : '') + '"><div class="form-row">' +
+          '<div class="field"><label for="userFirst">Prénom</label><input id="userFirst" value="' + escapeHtml(editing ? editing.prenom : '') + '" required></div>' +
+          '<div class="field"><label for="userLast">Nom</label><input id="userLast" value="' + escapeHtml(editing ? editing.nom : '') + '" required></div>' +
+          '<div class="field"><label for="userEmail">E-mail</label><input id="userEmail" type="email" value="' + escapeHtml(editing ? editing.email : '') + '" required></div>' +
+          '<div class="field"><label for="userRole">Rôle</label><select id="userRole">' + roles.map(role => '<option value="' + role + '"' + (editing && editing.role === role ? ' selected' : '') + '>' + escapeHtml(roleName(role)) + '</option>').join("") + '</select></div>' +
+          '<div class="field"><label for="userPassword">Mot de passe ' + (editing ? "(laisser vide pour conserver)" : '') + '</label><input id="userPassword" type="password" ' + (editing ? '' : 'required') + '></div>' +
+          '<div class="field"><label for="userTjm">TJM (si freelance)</label><input id="userTjm" type="number" min="0.01" step="0.01" placeholder="4500"></div>' +
+          '<div class="field"><label for="userSpeciality">Spécialité (si freelance)</label><input id="userSpeciality" placeholder="Développement" ></div>' +
+          '<div class="field" style="align-self:end"><button class="btn" type="submit">' + (editing ? "Enregistrer les modifications" : "Créer le compte") + '</button></div></div><div id="userFormError"></div></form></section>' +
+          '<section class="card"><div class="table-wrap"><table><thead><tr><th>Utilisateur</th><th>E-mail</th><th>Rôle</th><th>État</th><th></th></tr></thead><tbody>' +
+          (users.length ? users.map(user => '<tr><td><strong>' + escapeHtml(user.prenom + " " + user.nom) + '</strong></td><td>' + escapeHtml(user.email) + '</td><td>' + badge(user.role) + '</td><td>' + badge(user.actif ? "ACTIF" : "INACTIF") + '</td><td><div class="table-actions"><button class="btn secondary small" data-action="edit-user" data-id="' + user.id + '">Modifier</button><button class="btn ' + (user.actif ? 'danger' : 'success') + ' small" data-action="toggle-user" data-id="' + user.id + '">' + (user.actif ? "Désactiver" : "Activer") + '</button></div></td></tr>').join("") : emptyRow(5, "Aucun utilisateur.")) +
+          '</tbody></table></div></section>';
+      }
+      async function renderSettings() {
+        const [parameters, types] = await Promise.all([api("/api/admin/parametres"), api("/api/admin/types-projet")]);
+        $("#pageContent").innerHTML = '<div class="toolbar"><div><h2>Paramètres métier</h2><div class="hint">Configurez les valeurs par défaut utilisées par la plateforme.</div></div><button class="btn secondary" data-action="refresh">↻ Actualiser</button></div>' +
+          '<div class="split"><section class="card"><div class="card-heading"><div><h3>Paramètres système</h3><p>TJM par défaut et seuils d’analyse.</p></div></div><div class="table-wrap"><table><thead><tr><th>Clé</th><th>Valeur</th><th></th></tr></thead><tbody>' +
+          (parameters.length ? parameters.map(parameter => '<tr><td><strong>' + escapeHtml(parameter.cle) + '</strong></td><td><input class="param-value" id="param-' + escapeHtml(parameter.cle) + '" value="' + escapeHtml(parameter.valeur) + '"></td><td><button class="btn small" data-action="save-param" data-key="' + escapeHtml(parameter.cle) + '">Enregistrer</button></td></tr>').join("") : emptyRow(3, "Aucun paramètre.")) +
+          '</tbody></table></div></section><section class="card"><div class="card-heading"><div><h3>Types de projet</h3><p>Catégories proposées lors de la création des projets.</p></div></div>' +
+          '<form id="typeForm" class="form-row"><div class="field"><label for="typeLabel">Nouveau type</label><input id="typeLabel" required></div><div class="field" style="align-self:end"><button class="btn" type="submit">Ajouter</button></div></form><div id="typeFormError"></div><div class="table-wrap"><table><thead><tr><th>Type disponible</th></tr></thead><tbody>' +
+          (types.length ? types.map(type => '<tr><td>' + escapeHtml(type.libelle) + '</td></tr>').join("") : emptyRow(1, "Aucun type de projet.")) +
+          '</tbody></table></div></section></div>';
+      }
+      async function refreshView() { await navigate(state.view); }
+
+      $("#loginForm").addEventListener("submit", async event => {
+        event.preventDefault();
+        const button = $("#loginButton");
+        const errorBox = $("#loginError");
+        button.disabled = true;
+        $("#loginButtonLabel").textContent = "Connexion...";
+        errorBox.textContent = "";
+        try {
+          const response = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: $("#email").value.trim(), motDePasse: $("#password").value })
+          });
+          const body = await response.json();
+          if (!response.ok) throw new Error(body.message || body.error || "Identifiants incorrects.");
+          if ($("#rememberEmail").checked) {
+            localStorage.setItem("cdg-remembered-email", $("#email").value.trim());
+          } else {
+            localStorage.removeItem("cdg-remembered-email");
+          }
+          state.token = body.token;
+          sessionStorage.setItem("cdg-token", body.token);
+          showApp(body.utilisateur);
+        } catch (error) {
+          errorBox.textContent = error.message || "Connexion impossible.";
+        } finally {
+          button.disabled = false;
+          $("#loginButtonLabel").textContent = "Se connecter";
+        }
+      });
+      $("#navigation").addEventListener("click", event => {
+        const button = event.target.closest("[data-view]");
+        if (button && !button.hidden) navigate(button.dataset.view);
+      });
+      $("#logoutButton").addEventListener("click", signOut);
+      $("#menuButton").addEventListener("click", () => $("#sidebar").classList.toggle("open"));
+      $("#pageContent").addEventListener("click", async event => {
+        const nav = event.target.closest("[data-nav]");
+        if (nav) return navigate(nav.dataset.nav);
+        const button = event.target.closest("[data-action]");
+        if (!button) return;
+        const action = button.dataset.action;
+        try {
+          if (action === "refresh") return refreshView();
+          if (action === "create-project") return showProjectForm();
+          if (action === "close-project-form") {
+            $("#projectCreateForm").innerHTML = "";
+            return;
+          }
+          if (action === "project-tasks") {
+            const target = $("#projectTasks");
+            target.innerHTML = '<section class="card" style="margin-top:16px"><div class="empty">Chargement du projet…</div></section>';
+            await renderProjectDetails(button.dataset.id);
+            return;
+          }
+          if (action === "close-project-detail") {
+            $("#projectTasks").innerHTML = "";
+            return;
+          }
+          if (action === "edit-freelance") {
+            const person = (state.freelancers || []).find(item => String(item.id) === button.dataset.id);
+            if (!person) throw new Error("Fiche freelance introuvable.");
+            $("#freelanceEditor").innerHTML = '<section class="card" style="margin-top:16px"><div class="card-heading"><div><h3>Modifier la fiche de ' + escapeHtml(person.prenom + " " + person.nom) + '</h3></div><button class="btn secondary small" data-action="close-freelance-edit">Fermer</button></div><form id="freelanceForm" data-id="' + person.id + '"><div class="form-row"><div class="field"><label>TJM (MAD)</label><input id="freelanceTjm" type="number" min="0.01" step="0.01" value="' + person.tjm + '" required></div><div class="field"><label>Spécialité</label><input id="freelanceSpeciality" value="' + escapeHtml(person.specialite || "") + '"></div><div class="field"><label>Statut</label><select id="freelanceStatus"><option value="ACTIF"' + (person.statut === "ACTIF" ? " selected" : "") + '>ACTIF</option><option value="INACTIF"' + (person.statut !== "ACTIF" ? " selected" : "") + '>INACTIF</option></select></div></div><button class="btn" type="submit">Enregistrer la fiche</button><div id="freelanceFormError"></div></form></section>';
+            return;
+          }
+          if (action === "close-freelance-edit" || action === "cancel-user-edit") {
+            state.editingUser = null;
+            if (action === "close-freelance-edit") $("#freelanceEditor").innerHTML = "";
+            else return renderUsers();
+            return;
+          }
+          if (action === "edit-user") {
+            state.editingUser = (state.users || []).find(user => String(user.id) === button.dataset.id) || null;
+            return renderUsers();
+          }
+          if (action === "toggle-user") {
+            await api("/api/admin/utilisateurs/" + button.dataset.id + "/statut", { method: "PATCH" });
+            toast("Statut du compte modifié.");
+            return renderUsers();
+          }
+          if (action === "save-param") {
+            const key = button.dataset.key;
+            const value = document.getElementById("param-" + key).value;
+            await api("/api/admin/parametres", { method: "PUT", body: JSON.stringify({ cle: key, valeur: value }) });
+            toast("Paramètre enregistré.");
+            return;
+          }
+          if (action === "run-analysis") {
+            button.disabled = true;
+            const result = await api("/api/analyses/executer", { method: "POST" });
+            toast("Analyse terminée : " + result.alertesCreeesOuActualisees + " alerte(s) créée(s)/actualisée(s).");
+            return renderAnalysis();
+          }
+          if (action === "resolve-alert") {
+            await api("/api/alertes/" + button.dataset.id + "/traitee", { method: "PATCH" });
+            toast("Alerte marquée comme traitée.");
+            return renderAnalysis();
+          }
+          if (action === "update-task-progress") {
+            const value = window.prompt("Avancement de la tâche (0 à 100 %) :", button.dataset.progress);
+            if (value === null) return;
+            const progressValue = Number(value);
+            if (!Number.isInteger(progressValue) || progressValue < 0 || progressValue > 100) throw new Error("L'avancement doit être un nombre entier de 0 à 100.");
+            await api("/api/taches/" + button.dataset.id + "/avancement", { method: "PATCH", body: JSON.stringify({ avancement: progressValue }) });
+            toast("Avancement de la tâche mis à jour.");
+            return renderProjects();
+          }
+          if (action === "open-sheet") {
+            $("#newSheetForm").innerHTML = '<section class="card" style="margin-bottom:16px"><form id="openSheetForm"><div class="form-row"><div class="field"><label for="weekStart">Lundi de la semaine</label><input id="weekStart" type="date" value="' + mondayOfCurrentWeek() + '" required></div><div class="field" style="align-self:end"><button class="btn" type="submit">Créer / ouvrir</button></div></div><div class="muted">La date doit être un lundi.</div><div id="openSheetError"></div></form></section>';
+            return;
+          }
+          if (action === "select-sheet") {
+            $("#sheetDetail").innerHTML = '<section class="card" style="margin-top:16px"><div class="empty">Chargement…</div></section>';
+            await renderSheetDetail(button.dataset.id);
+            return;
+          }
+          if (action === "close-detail") {
+            $("#sheetDetail").innerHTML = "";
+            state.selectedSheet = null;
+            return;
+          }
+          if (action === "submit-sheet") {
+            if (!window.confirm("Soumettre cette feuille de temps à validation ?")) return;
+            await api("/api/timesheets/" + button.dataset.id + "/soumettre", { method: "POST" });
+            toast("Feuille de temps soumise.");
+            return refreshView();
+          }
+          if (action === "approve-sheet") {
+            if (!window.confirm("Valider cette feuille de temps et générer son PV ?")) return;
+            await api("/api/timesheets/" + button.dataset.id + "/valider", { method: "POST" });
+            toast("Feuille validée. Le PV a été généré.");
+            return refreshView();
+          }
+          if (action === "reject-sheet") {
+            const motif = window.prompt("Motif du rejet :");
+            if (!motif || !motif.trim()) return;
+            await api("/api/timesheets/" + button.dataset.id + "/rejeter", { method: "POST", body: JSON.stringify({ motif: motif.trim() }) });
+            toast("Feuille rejetée.");
+            return refreshView();
+          }
+          if (action === "delete-line") {
+            if (!window.confirm("Supprimer cette ligne de saisie ?")) return;
+            await api("/api/timesheets/" + button.dataset.id + "/lignes/" + button.dataset.line, { method: "DELETE" });
+            toast("Ligne supprimée.");
+            return renderSheetDetail(button.dataset.id);
+          }
+          if (action === "mark-paid") {
+            const reference = window.prompt("Référence du paiement (facultatif) :", "");
+            if (reference === null) return;
+            await api("/api/paiements/" + button.dataset.id, {
+              method: "PATCH",
+              body: JSON.stringify({ statut: "PAYE", datePaiement: new Date().toISOString().slice(0, 10), reference: reference.trim() || null })
+            });
+            toast("Paiement marqué comme payé.");
+            return refreshView();
+          }
+          if (action === "download-pv") {
+            const file = await api("/api/pv/" + button.dataset.id + "/pdf");
+            const url = URL.createObjectURL(file);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "PV-CDG-" + button.dataset.id + ".pdf";
+            link.click();
+            URL.revokeObjectURL(url);
+            return;
+          }
+        } catch (error) {
+          toast(error.message || "L'opération a échoué.");
+        }
+      });
+      $("#pageContent").addEventListener("submit", async event => {
+        event.preventDefault();
+        try {
+          if (event.target.id === "openSheetForm") {
+            const week = $("#weekStart").value;
+            const result = await api("/api/timesheets", { method: "POST", body: JSON.stringify({ semaineDebut: week }) });
+            toast("Semaine ouverte.");
+            await renderTimesheets();
+            await renderSheetDetail(result.id);
+          } else if (event.target.id === "lineForm") {
+            const sheet = state.selectedSheet;
+            if (!sheet) throw new Error("Sélectionnez une feuille de temps.");
+            await api("/api/timesheets/" + sheet.id + "/lignes", {
+              method: "POST",
+              body: JSON.stringify({
+                tacheId: Number($("#lineTask").value),
+                dateSaisie: $("#lineDate").value,
+                heures: Number($("#lineHours").value)
+              })
+            });
+            toast("Heures ajoutées à la feuille.");
+            await renderSheetDetail(sheet.id);
+          } else if (event.target.id === "projectForm") {
+            const body = {
+              code: $("#projectCode").value.trim(),
+              nom: $("#projectName").value.trim(),
+              description: $("#projectDescription").value.trim(),
+              budget: Number($("#projectBudget").value),
+              dateDebut: $("#projectStart").value,
+              dateFinPrevue: $("#projectEnd").value,
+              typeProjetId: Number($("#projectType").value),
+              chefProjetId: state.user.role === "ADMIN" ? Number($("#projectChief").value) : state.user.id
+            };
+            await api("/api/projets", { method: "POST", body: JSON.stringify(body) });
+            toast("Projet créé.");
+            await renderProjects();
+          } else if (event.target.id === "assignmentForm") {
+            await api("/api/projets/" + event.target.dataset.project + "/affectations", {
+              method: "POST",
+              body: JSON.stringify({
+                freelanceId: Number($("#assignmentFreelance").value),
+                tjmApplique: Number($("#assignmentTjm").value),
+                dateDebut: $("#assignmentStart").value,
+                dateFin: $("#assignmentEnd").value || null
+              })
+            });
+            toast("Freelance affecté au projet.");
+            await renderProjectDetails(event.target.dataset.project);
+          } else if (event.target.id === "taskForm") {
+            await api("/api/projets/" + event.target.dataset.project + "/taches", {
+              method: "POST",
+              body: JSON.stringify({
+                titre: $("#taskTitle").value.trim(),
+                chargeEstimee: Number($("#taskLoad").value),
+                affectationId: $("#taskAssignment").value ? Number($("#taskAssignment").value) : null,
+                dateDebut: $("#taskStart").value || null,
+                dateFin: $("#taskEnd").value || null
+              })
+            });
+            toast("Tâche créée.");
+            await renderProjectDetails(event.target.dataset.project);
+          } else if (event.target.id === "freelanceForm") {
+            await api("/api/freelances/" + event.target.dataset.id, {
+              method: "PUT",
+              body: JSON.stringify({
+                tjm: Number($("#freelanceTjm").value),
+                specialite: $("#freelanceSpeciality").value.trim(),
+                statut: $("#freelanceStatus").value
+              })
+            });
+            toast("Fiche freelance mise à jour.");
+            await renderFreelancers();
+          } else if (event.target.id === "userForm") {
+            const id = event.target.dataset.id;
+            const payload = {
+              nom: $("#userLast").value.trim(),
+              prenom: $("#userFirst").value.trim(),
+              email: $("#userEmail").value.trim(),
+              role: $("#userRole").value
+            };
+            if ($("#userPassword").value) payload.motDePasse = $("#userPassword").value;
+            if (!id) {
+              payload.motDePasse = $("#userPassword").value;
+              payload.tjm = $("#userTjm").value ? Number($("#userTjm").value) : null;
+              payload.specialite = $("#userSpeciality").value.trim() || null;
+            }
+            await api(id ? "/api/admin/utilisateurs/" + id : "/api/admin/utilisateurs", {
+              method: id ? "PUT" : "POST",
+              body: JSON.stringify(payload)
+            });
+            state.editingUser = null;
+            toast(id ? "Compte utilisateur modifié." : "Compte utilisateur créé.");
+            await renderUsers();
+          } else if (event.target.id === "typeForm") {
+            await api("/api/admin/types-projet", { method: "POST", body: JSON.stringify({ libelle: $("#typeLabel").value.trim() }) });
+            toast("Type de projet ajouté.");
+            await renderSettings();
+          } else if (event.target.id === "monthlyReportForm") {
+            const month = $("#reportMonth").value;
+            const file = await api("/api/analyses/rapport-mensuel?mois=" + encodeURIComponent(month));
+            const url = URL.createObjectURL(file);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "Rapport-Mensuel-CDG-" + month + ".pdf";
+            link.click();
+            URL.revokeObjectURL(url);
+            toast("Rapport mensuel téléchargé.");
+          }
+        } catch (error) {
+          const errorIds = {
+            openSheetForm: "openSheetError",
+            lineForm: "lineError",
+            projectForm: "projectFormError",
+            assignmentForm: "assignmentError",
+            taskForm: "taskFormError",
+            freelanceForm: "freelanceFormError",
+            userForm: "userFormError",
+            typeForm: "typeFormError"
+          };
+          const box = errorIds[event.target.id] ? $("#" + errorIds[event.target.id]) : null;
+          if (box) showError(box, error);
+          else toast(error.message || "L'opération a échoué.");
+        }
+      });
+      if (state.token) {
+        api("/api/auth/me").then(user => showApp(user)).catch(() => signOut());
+      }
+    })();
+  </script>
+</body>
+</html>

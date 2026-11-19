@@ -1,0 +1,40 @@
+<div class="top-strip" aria-hidden="true"></div>
+<header class="site-header" [class.is-scrolled]="scrolled()">
+  <div class="header-inner">
+    <a class="brand" href="#accueil" aria-label="CDG — Accueil" (click)="closeMobileMenu()">
+      <img src="assets/logo-cdg.png" alt="CDG — Caisse de Dépôt et de Gestion" />
+    </a>
+
+    <button
+      class="menu-toggle"
+      type="button"
+      aria-controls="primary-navigation"
+      [attr.aria-expanded]="mobileMenuOpen()"
+      [attr.aria-label]="mobileMenuOpen() ? 'Fermer le menu' : 'Ouvrir le menu'"
+      (click)="mobileMenuOpen.update((open) => !open)"
+    >
+      <span></span><span></span><span></span>
+    </button>
+
+    <nav
+      class="primary-nav"
+      id="primary-navigation"
+      aria-label="Navigation principale"
+      [class.is-open]="mobileMenuOpen()"
+    >
+      <a href="#accueil" [class.active]="activeSection() === 'accueil'" [attr.aria-current]="activeSection() === 'accueil' ? 'location' : null" (click)="closeMobileMenu()">Accueil</a>
+      <a href="#fonctionnalites" [class.active]="activeSection() === 'fonctionnalites'" [attr.aria-current]="activeSection() === 'fonctionnalites' ? 'location' : null" (click)="closeMobileMenu()">Fonctionnalités</a>
+      <a href="#processus" [class.active]="activeSection() === 'processus'" [attr.aria-current]="activeSection() === 'processus' ? 'location' : null" (click)="closeMobileMenu()">Processus</a>
+
+      <div class="header-actions">
+        <label class="visually-hidden" for="landing-language">Sélection de la langue</label>
+        <select id="landing-language" aria-label="Sélection de la langue" [value]="language" (change)="changeLanguage($event)">
+          <option value="FR">FR</option>
+          <option value="EN">EN</option>
+          <option value="AR">AR</option>
+        </select>
+        <a class="login-cta" href="#connexion" (click)="closeMobileMenu()">Se connecter</a>
+      </div>
+    </nav>
+  </div>
+</header>

@@ -1,0 +1,66 @@
+:host {
+  display: block;
+}
+
+.login-section {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 96px 16px;
+  background: var(--bg);
+
+  &::before {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+      linear-gradient(rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2)),
+      url('/assets/arrp.png') center center / cover no-repeat;
+    content: '';
+    pointer-events: none;
+  }
+}
+
+.login-section-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 30px;
+  width: min(1140px, 100%);
+  margin: 0 auto;
+}
+
+.login-context {
+  max-width: 660px;
+  text-align: center;
+
+  .eyebrow {
+    margin: 0 0 10px;
+    color: var(--green);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  h2 {
+    margin: 0;
+    color: var(--text);
+    font-size: clamp(26px, 3vw, 34px);
+    font-weight: 700;
+    line-height: 1.25;
+  }
+
+  p:last-child {
+    margin: 10px 0 0;
+    color: var(--muted);
+  }
+}
+
+@media (max-width: 600px) {
+  .login-section {
+    padding: 64px 16px;
+  }
+}

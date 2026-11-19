@@ -1,0 +1,10 @@
+<a class="skip-link" href="#main-content">Aller au contenu principal</a>
+<app-landing-header />
+<main id="main-content" tabindex="-1">
+  <app-landing-hero />
+  <app-landing-features />
+  <app-landing-process />
+  <app-landing-stats />
+  <app-landing-login-section (authenticated)="authenticated.emit()" />
+</main>
+<app-landing-footer />

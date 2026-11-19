@@ -1,0 +1,19 @@
+<section class="process-section" id="processus" aria-labelledby="process-title">
+  <div class="section-container">
+    <header class="section-heading" appReveal>
+      <p class="eyebrow">Un parcours clair</p>
+      <h2 id="process-title">Du temps saisi au PV validé</h2>
+      <span class="section-rule" aria-hidden="true"></span>
+    </header>
+
+    <ol class="process-track" aria-label="Étapes du processus de validation" appReveal>
+      @for (step of steps; track step.title; let index = $index) {
+        <li class="process-step" appReveal [style.--reveal-delay]="index * 120 + 'ms'">
+          <span class="step-number">{{ index + 1 }}</span>
+          <h3>{{ step.title }}</h3>
+          <p>{{ step.description }}</p>
+        </li>
+      }
+    </ol>
+  </div>
+</section>

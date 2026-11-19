@@ -1,0 +1,57 @@
+<h2 mat-dialog-title>{{ data.title }}</h2>
+
+<form [formGroup]="form" (ngSubmit)="submit()">
+  <mat-dialog-content>
+    @if (data.description) {
+      <p class="dialog-description">{{ data.description }}</p>
+    }
+
+    @if (data.fields.length) {
+      <div class="dialog-grid">
+        @for (field of data.fields; track field.key) {
+            @if (isVisible(field)) {
+              <mat-form-field appearance="outline" [class.full-width]="field.type === 'textarea'">
+                <mat-label>{{ field.label }}</mat-label>
+                @if (field.type === 'select') {
+                  <mat-select [formControlName]="field.key">
+                    @for (option of field.options ?? []; track option.value) {
+                      <mat-option [value]="option.value">{{ option.label }}</mat-option>
+                    }
+                  </mat-select>
+                } @else if (field.type === 'textarea') {
+                  <textarea matInput [formControlName]="field.key" rows="3"></textarea>
+                } @else {
+                  <input
+                    matInput
+                    [type]="field.type"
+                    [formControlName]="field.key"
+                    [min]="field.min ?? null"
+                    [max]="field.max ?? null"
+                    [step]="field.step ?? null"
+                  >
+                }
+                @if (field.hint) {
+                  <mat-hint>{{ field.hint }}</mat-hint>
+                }
+                @if (control(field).touched && control(field).invalid) {
+                  <mat-error>{{ errorText(field) }}</mat-error>
+                }
+              </mat-form-field>
+            }
+        }
+      </div>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" mat-dialog-close>Annuler</button>
+    <button
+      mat-flat-button
+      [color]="data.danger ? 'warn' : 'primary'"
+      type="submit"
+      [disabled]="data.fields.length > 0 && hasVisibleErrors()"
+    >
+      {{ data.submitLabel ?? 'Enregistrer' }}
+    </button>
+  </mat-dialog-actions>
+</form>

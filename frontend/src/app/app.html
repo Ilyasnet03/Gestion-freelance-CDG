@@ -1,0 +1,229 @@
+@if (!isDashboardRoute || !user) {
+  <app-landing-page (authenticated)="onLandingAuthenticated()" />
+} @else {
+  <a class="skip-link" href="#main-content">Aller au contenu principal</a>
+  <div class="app-shell" [class.menu-open]="menuOpen" [attr.dir]="language === 'AR' ? 'rtl' : 'ltr'">
+    <button class="sidebar-backdrop" type="button" aria-label="Fermer le menu" (click)="menuOpen = false"></button>
+    <aside class="sidebar" id="app-menu" aria-label="Menu principal">
+      <div class="side-brand">
+        <span class="brand-mark" aria-hidden="true">CDG</span>
+        <span>Gestion<br>des freelances</span>
+      </div>
+      <p class="nav-label">Espace de travail</p>
+      <nav>
+        @for (item of visibleMenu; track item.id) {
+          <button mat-button class="nav-button" [class.active]="currentView === item.id" (click)="selectView(item.id)" [attr.aria-current]="currentView === item.id ? 'page' : null">
+            <span class="nav-icon" aria-hidden="true">{{ navIcon(item.id) }}</span>
+            {{ item.title }}
+          </button>
+        }
+      </nav>
+      <div class="sidebar-bottom">
+        <strong>{{ user.prenom }} {{ user.nom }}</strong>
+        <span>{{ roleLabel(user.role) }}</span>
+        <button mat-button class="nav-button logout-button" (click)="logout()">Déconnexion</button>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <button mat-button class="menu-toggle" type="button" (click)="menuOpen = !menuOpen" [attr.aria-expanded]="menuOpen" aria-controls="app-menu" aria-label="Ouvrir ou fermer le menu">☰</button>
+        <h1>{{ title }}</h1>
+        <div class="topbar-user">
+          <select aria-label="Langue" [ngModel]="language" (ngModelChange)="setLanguage($event)" name="app-language">
+            <option value="FR">FR</option><option value="EN">EN</option><option value="AR">AR</option>
+          </select>
+          <span>{{ user.prenom || user.email }}</span>
+          <span class="avatar" aria-hidden="true">{{ user.prenom.charAt(0) }}{{ user.nom.charAt(0) }}</span>
+        </div>
+      </header>
+
+      <main class="content" id="main-content" tabindex="-1">
+        @if (error) {
+          <mat-card class="error-panel" role="alert">{{ error }}</mat-card>
+        }
+        @if (notice) {
+          <div class="notice-panel" role="status">{{ notice }}</div>
+        }
+        @if (currentView === 'dashboard' && dashboard) {
+          <section class="welcome-row">
+            <div>
+              <h2>Bonjour {{ user.prenom || 'et bienvenue' }}</h2>
+              <p>Indicateurs de votre portefeuille CDG.</p>
+            </div>
+            <button mat-stroked-button color="primary" (click)="loadView()">Actualiser</button>
+          </section>
+          <section class="kpi-grid">
+            <mat-card class="kpi-card"><span>Projets actifs</span><strong>{{ stat('projetsActifsCount') }}</strong></mat-card>
+            <mat-card class="kpi-card"><span>Budget global</span><strong>{{ money(dashboard['budgetGlobalTotal']) }}</strong></mat-card>
+            <mat-card class="kpi-card"><span>Budget consommé</span><strong>{{ money(dashboard['budgetConsommeTotal']) }}</strong></mat-card>
+            <mat-card class="kpi-card"><span>Timesheets à valider</span><strong>{{ stat('timesheetsAValiderCount') }}</strong></mat-card>
+          </section>
+          <section class="dashboard-grid">
+            <mat-card class="panel-card">
+              <div class="panel-heading"><div><h2>Projets</h2><p>Avancement et consommation budgétaire</p></div><button mat-stroked-button (click)="selectView('projects')">Tout voir</button></div>
+              <div class="table-wrap">
+                <table mat-table [dataSource]="rows" class="data-table">
+                  <ng-container matColumnDef="name"><th mat-header-cell *matHeaderCellDef>Projet</th><td mat-cell *matCellDef="let row"><strong>{{ text(row, 'nom') }}</strong><small>{{ text(row, 'code') }}</small></td></ng-container>
+                  <ng-container matColumnDef="status"><th mat-header-cell *matHeaderCellDef>Statut</th><td mat-cell *matCellDef="let row"><span class="status-badge">{{ cell(row, 'statut') }}</span></td></ng-container>
+                  <ng-container matColumnDef="progress"><th mat-header-cell *matHeaderCellDef>Avancement</th><td mat-cell *matCellDef="let row"><mat-progress-bar mode="determinate" [value]="number(row, 'avancementGlobal')"></mat-progress-bar>{{ cell(row, 'avancementGlobal') }}</td></ng-container>
+                  <ng-container matColumnDef="budget"><th mat-header-cell *matHeaderCellDef>Budget consommé</th><td mat-cell *matCellDef="let row">{{ money(row['budgetConsomme']) }} / {{ money(row['budget']) }}</td></ng-container>
+                  <tr mat-header-row *matHeaderRowDef="['name', 'status', 'progress', 'budget']"></tr>
+                  <tr mat-row *matRowDef="let row; columns: ['name', 'status', 'progress', 'budget'];"></tr>
+                </table>
+              </div>
+            </mat-card>
+            <mat-card class="panel-card">
+              <div class="panel-heading"><div><h2>Alertes récentes</h2><p>{{ stat('alertesCritiquesCount') }} critique(s) · {{ stat('alertesAttentionCount') }} à surveiller</p></div></div>
+              @for (alert of alerts(); track $index) {
+                <article class="alert-item">
+                  <strong>{{ text(alert, 'projetNom') || 'Projet' }} · {{ cell(alert, 'niveau') }}</strong>
+                  <p>{{ text(alert, 'message') }}</p>
+                  <small>{{ cell(alert, 'dateCreation') }}</small>
+                </article>
+              } @empty {
+                <p class="empty-state">Aucune alerte en attente. Tout est à jour.</p>
+              }
+            </mat-card>
+          </section>
+        } @else if (currentView !== 'dashboard') {
+          <section class="toolbar">
+            <div><h2>{{ sectionTitle }}</h2><p class="secondary-text">{{ sectionHint }}</p></div>
+            <div class="toolbar-actions">
+              @if (canCreate) {
+                <button mat-flat-button color="primary" (click)="startCreate()">Ajouter</button>
+              }
+              @if (currentView === 'analysis') {
+                <button mat-stroked-button color="primary" (click)="runAnalysis()">Exécuter l’analyse</button>
+                <button mat-stroked-button (click)="downloadMonthlyReport()">Rapport mensuel</button>
+              }
+              <button mat-stroked-button (click)="loadView()">Actualiser</button>
+            </div>
+          </section>
+
+          @if (currentView === 'billing' || currentView === 'settings') {
+            <mat-card class="panel-card secondary-list">
+              <h2>{{ currentView === 'billing' ? 'Procès-verbaux de réception' : 'Types de projet' }}</h2>
+              <div class="table-wrap">
+                <table mat-table [dataSource]="secondaryRows" class="data-table compact-table">
+                  @for (column of secondaryColumns; track column.key) {
+                    <ng-container [matColumnDef]="column.key"><th mat-header-cell *matHeaderCellDef>{{ column.label }}</th><td mat-cell *matCellDef="let row">{{ cell(row, column.key) }}</td></ng-container>
+                  }
+                  @if (currentView === 'billing') {
+                    <ng-container matColumnDef="download">
+                      <th mat-header-cell *matHeaderCellDef>Actions</th>
+                      <td mat-cell *matCellDef="let row">
+                        <button mat-icon-button [matMenuTriggerFor]="pvActions" aria-label="Actions du procès-verbal">⋮</button>
+                        <mat-menu #pvActions="matMenu">
+                          <button mat-menu-item (click)="downloadPv(row)">Télécharger le PDF</button>
+                        </mat-menu>
+                      </td>
+                    </ng-container>
+                  }
+                  <tr mat-header-row *matHeaderRowDef="secondaryColumnKeys"></tr>
+                  <tr mat-row *matRowDef="let row; columns: secondaryColumnKeys;"></tr>
+                </table>
+                @if (!secondaryRows.length) { <p class="empty-state">Aucune donnée à afficher.</p> }
+              </div>
+              @if (currentView === 'settings') { <button mat-stroked-button color="primary" (click)="createType()">Ajouter un type de projet</button> }
+            </mat-card>
+          }
+
+          <mat-card class="panel-card">
+            <div class="table-wrap">
+              <table mat-table [dataSource]="rows" class="data-table">
+                @for (column of columns; track column.key) {
+                  <ng-container [matColumnDef]="column.key">
+                    <th mat-header-cell *matHeaderCellDef>{{ column.label }}</th>
+                    <td mat-cell *matCellDef="let row">
+                      @if (column.key === 'statut' || column.key === 'niveau' || column.key === 'traitee') {
+                        <span class="status-badge" [ngClass]="statusClass(row, column.key)">{{ cell(row, column.key) }}</span>
+                      } @else {
+                        {{ cell(row, column.key) }}
+                      }
+                    </td>
+                  </ng-container>
+                }
+                <ng-container matColumnDef="actions">
+                  <th mat-header-cell *matHeaderCellDef>Actions</th>
+                  <td mat-cell *matCellDef="let row">
+                    <button
+                      mat-icon-button
+                      [matMenuTriggerFor]="rowActions"
+                      [attr.aria-label]="'Actions — ' + (text(row, 'nomComplet') || text(row, 'nom') || text(row, 'titre') || 'élément')"
+                    >⋮</button>
+                    <mat-menu #rowActions="matMenu">
+                      @if (actionLabel(row) && !(currentView === 'billing' && text(row, 'statut') === 'PAYE') && !(currentView === 'analysis' && bool(row, 'traitee'))) {
+                        <button mat-menu-item (click)="rowAction(row)">{{ actionLabel(row) }}</button>
+                      }
+                      @if (currentView === 'timesheets' && user.role === 'FREELANCE' && ['BROUILLON', 'REJETEE'].includes(text(row, 'statut'))) {
+                        <button mat-menu-item (click)="submitSheet(row)">Soumettre à validation</button>
+                      }
+                      @if (currentView === 'timesheets' && user.role !== 'FREELANCE' && text(row, 'statut') === 'SOUMISE') {
+                        <button mat-menu-item (click)="rejectSheet(row)">Rejeter la feuille</button>
+                      }
+                      @if (currentView === 'users') {
+                        <button mat-menu-item (click)="editUser(row)">Modifier le compte</button>
+                      }
+                    </mat-menu>
+                  </td>
+                </ng-container>
+                <tr mat-header-row *matHeaderRowDef="columnKeysWithActions"></tr>
+                <tr mat-row *matRowDef="let row; columns: columnKeysWithActions;"></tr>
+              </table>
+              <p class="empty-state" [hidden]="rows.length > 0 || loading">Aucune donnée à afficher.</p>
+            </div>
+          </mat-card>
+
+          @if (detailTitle) {
+            <mat-card class="panel-card detail-card">
+              <div class="panel-heading">
+                <div><h2>{{ detailTitle }}</h2></div>
+                <div class="toolbar-actions">
+                  @if (currentView === 'projects' && canManage) {
+                    <button mat-stroked-button color="primary" [matMenuTriggerFor]="projectActions">Actions du projet</button>
+                    <mat-menu #projectActions="matMenu">
+                      <button mat-menu-item (click)="createTask()">Créer une tâche</button>
+                      <button mat-menu-item (click)="assignFreelancer()">Affecter un freelance</button>
+                    </mat-menu>
+                  }
+                  @if (currentView === 'timesheets' && canEditSelectedSheet) {
+                    <button mat-flat-button color="primary" (click)="addHours()">Ajouter des heures</button>
+                  }
+                  <button mat-button (click)="detailTitle = ''; detailRows = []; selectedSheet = null; selectedProject = null">Fermer</button>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table mat-table [dataSource]="detailRows" class="data-table">
+                  @for (column of detailColumns; track column.key) {
+                    <ng-container [matColumnDef]="column.key"><th mat-header-cell *matHeaderCellDef>{{ column.label }}</th><td mat-cell *matCellDef="let row">{{ cell(row, column.key) }}</td></ng-container>
+                  }
+                  @if (currentView === 'projects' || canEditSelectedSheet) {
+                    <ng-container matColumnDef="actions">
+                      <th mat-header-cell *matHeaderCellDef>Actions</th>
+                      <td mat-cell *matCellDef="let row">
+                        <button mat-icon-button [matMenuTriggerFor]="detailActions" aria-label="Actions sur le détail">⋮</button>
+                        <mat-menu #detailActions="matMenu">
+                          @if (currentView === 'projects') {
+                            <button mat-menu-item (click)="detailAction(row)">Mettre à jour l’avancement</button>
+                          } @else if (canEditSelectedSheet) {
+                            <button mat-menu-item (click)="detailAction(row)">Supprimer la ligne d’heures</button>
+                          }
+                        </mat-menu>
+                      </td>
+                    </ng-container>
+                  }
+                  <tr mat-header-row *matHeaderRowDef="detailColumnKeys"></tr>
+                  <tr mat-row *matRowDef="let row; columns: detailColumnKeys;"></tr>
+                </table>
+              </div>
+            </mat-card>
+          }
+        }
+      </main>
+      <footer class="app-footer">
+        <div class="app-footer-inner"><strong>CDG · Gestion des freelances</strong><span>Plateforme interne de gestion des projets, temps et facturation.</span></div>
+      </footer>
+    </div>
+  </div>
+}

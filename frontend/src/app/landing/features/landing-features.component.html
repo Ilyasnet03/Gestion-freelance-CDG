@@ -1,0 +1,47 @@
+<section class="features-section" id="fonctionnalites" aria-labelledby="features-title">
+  <div class="section-container">
+    <header class="section-heading" appReveal>
+      <p class="eyebrow">Une gestion unifiée</p>
+      <h2 id="features-title">Une plateforme, quatre modules</h2>
+      <span class="section-rule" aria-hidden="true"></span>
+    </header>
+
+    <div class="features-grid">
+      @for (feature of features; track feature.title; let index = $index) {
+        <article class="feature-card" appReveal [style.--reveal-delay]="index * 100 + 'ms'">
+          <span class="feature-icon" aria-hidden="true">
+            @switch (feature.icon) {
+              @case ('timesheet') {
+                <svg viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="8.5"></circle>
+                  <path d="M12 7v5l3.5 2"></path>
+                </svg>
+              }
+              @case ('projects') {
+                <svg viewBox="0 0 24 24">
+                  <path d="M3.5 7.5h6l2 2h9v8.8a1.7 1.7 0 0 1-1.7 1.7H5.2a1.7 1.7 0 0 1-1.7-1.7z"></path>
+                  <path d="M3.5 7.5V5.8a1.3 1.3 0 0 1 1.3-1.3h5l2 2h7.9a1.3 1.3 0 0 1 1.3 1.3v1.7"></path>
+                </svg>
+              }
+              @case ('billing') {
+                <svg viewBox="0 0 24 24">
+                  <path d="M6 3.5h8l4 4v13H6z"></path>
+                  <path d="M14 3.5v4h4M9 12h6M9 15.5h6"></path>
+                  <path d="m9 9 1.2 1.2L12.5 8"></path>
+                </svg>
+              }
+              @case ('analysis') {
+                <svg viewBox="0 0 24 24">
+                  <path d="M4 19.5h16M6.5 16v-4M12 16V7M17.5 16v-7"></path>
+                  <path d="m5.5 8 5-3 5 2 3-2"></path>
+                </svg>
+              }
+            }
+          </span>
+          <h3>{{ feature.title }}</h3>
+          <p>{{ feature.description }}</p>
+        </article>
+      }
+    </div>
+  </div>
+</section>

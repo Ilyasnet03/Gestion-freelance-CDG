@@ -1,0 +1,44 @@
+server:
+  port: ${SPRING_BOOT_PORT:8080}
+  error:
+    include-message: always
+    include-binding-errors: always
+
+spring:
+  application:
+    name: cdg-freelance-management
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${POSTGRES_DB:freelances}
+    username: ${POSTGRES_USER:app}
+    password: ${POSTGRES_PASSWORD:app_password_2026}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+# Configuration JWT & Sécurité
+application:
+  security:
+    jwt:
+      secret-key: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      expiration: ${JWT_EXPIRATION_MS:86400000} # 24 heures en millisecondes
+    internal-api-key: ${INTERNAL_API_KEY:cdg-internal-secret-api-key-2026}
+  storage:
+    pv-dir: ./uploads/pv
+  analytics:
+    fastapi-url: ${FASTAPI_BASE_URL:http://localhost:8000}
+    daily-cron: '${ANALYTICS_DAILY_CRON:0 0 2 * * *}'
+
+# Swagger OpenAPI Documentation
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui/index.html
+    tags-sorter: alpha
+    operations-sorter: alpha
