@@ -11,24 +11,24 @@ import { RevealDirective } from '../shared/reveal.directive';
 export class LandingFeaturesComponent {
   readonly features = [
     {
-      icon: 'timesheet',
       title: 'Timesheet',
-      description: 'Saisissez les heures travaillées par semaine et suivez leur validation.',
+      image: '/assets/feature-timesheet.jpg',
+      description: 'Saisie des heures travaillées, soumission des feuilles de temps et validation.',
     },
     {
-      icon: 'projects',
       title: 'Projets et tâches',
-      description: 'Organisez les projets, les tâches et les affectations des freelances.',
+      image: '/assets/feature-projects.jpg',
+      description: 'Organisation des projets, tâches et affectations des freelances.',
     },
     {
-      icon: 'billing',
       title: 'Facturation',
-      description: 'Préparez les PV de réception et suivez les éléments de facturation.',
+      image: '/assets/feature-billing.jpg',
+      description: 'Préparation des PV de réception et suivi des éléments de facturation.',
     },
     {
-      icon: 'analysis',
       title: 'Analyse et aide à la décision',
-      description: 'Consultez les indicateurs clés et repérez rapidement les points d’attention.',
+      image: '/assets/feature-analysis.jpg',
+      description: "Consultation des indicateurs clés et suivi de l'activité.",
     },
   ];
 }
