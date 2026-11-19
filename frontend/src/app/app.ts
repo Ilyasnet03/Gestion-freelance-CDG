@@ -1,10 +1,22 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component, DestroyRef, OnInit, inject } from '@angular/core';
+import {
+  ChangeDetectorRef,
+  Component,
+  DestroyRef,
+  OnInit,
+  TemplateRef,
+  ViewChild,
+  inject,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import {
+  MatDialog,
+  MatDialogModule,
+  MatDialogRef,
+} from '@angular/material/dialog';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatTableModule } from '@angular/material/table';
@@ -66,6 +78,9 @@ export class App implements OnInit {
   private readonly changeDetectorRef = inject(ChangeDetectorRef);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private detailDialogRef: MatDialogRef<unknown> | null = null;
+
+  @ViewChild('detailDialog') private detailDialogTemplate?: TemplateRef<unknown>;
 
   readonly menu: MenuItem[] = [
     { id: 'dashboard', title: "Vue d'ensemble" },
@@ -580,6 +595,7 @@ export class App implements OnInit {
 
   async openDetails(row: ApiRow): Promise<void> {
     const id = this.number(row, 'id');
+    await this.closeDetailsDialog();
     this.error = '';
     try {
       if (this.currentView === 'projects') {
@@ -614,11 +630,39 @@ export class App implements OnInit {
       } else {
         return;
       }
+      this.showDetailsDialog();
     } catch (error: unknown) {
       this.setError(error);
     } finally {
       this.changeDetectorRef.markForCheck();
     }
+  }
+
+  private showDetailsDialog(): void {
+    if (!this.detailDialogTemplate) {
+      throw new Error('La fenêtre de détails n’est pas disponible.');
+    }
+
+    const ref = this.dialog.open(this.detailDialogTemplate, {
+      width: '900px',
+      maxWidth: 'calc(100vw - 32px)',
+      maxHeight: 'calc(100vh - 32px)',
+      autoFocus: 'first-tabbable',
+      restoreFocus: true,
+    });
+    this.detailDialogRef = ref;
+    ref.afterClosed().subscribe(() => {
+      if (this.detailDialogRef === ref) this.detailDialogRef = null;
+    });
+  }
+
+  private async closeDetailsDialog(): Promise<void> {
+    const ref = this.detailDialogRef;
+    if (!ref) return;
+
+    this.detailDialogRef = null;
+    ref.close();
+    await firstValueFrom(ref.afterClosed());
   }
 
   actionLabel(row: ApiRow): string {
