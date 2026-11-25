@@ -1,0 +1,86 @@
+<section class="admin-insights" aria-label="Suivi du portefeuille administrateur">
+  <div class="insights-heading">
+    <div>
+      <span class="eyebrow">PILOTAGE ADMINISTRATEUR</span>
+      <h2>Avancement et activité</h2>
+      <p>Une vue consolidée du travail réalisé et des budgets engagés.</p>
+    </div>
+    <button pButton [outlined]="true" (click)="navigate.emit('timesheets')">Voir les feuilles de temps</button>
+  </div>
+
+  <div class="insight-summary">
+    <div><span>Projets sous l’avancement attendu</span><strong>{{ comparableCount ? belowPlanCount : '—' }} <small>/ {{ comparableCount }}</small></strong><small>Projets comparables : travail réalisé et temps écoulé</small></div>
+    <div><span>Heures validées</span>
+      @if (hoursLoading) { <strong>Chargement…</strong> }
+      @else if (hoursError) { <strong>—</strong> }
+      @else { <strong>{{ quantity(validatedHours) }} <small>h</small></strong> }
+      <small>Sur les 8 dernières semaines, semaine en cours incluse</small>
+    </div>
+  </div>
+
+  <div class="insight-grid">
+    <section class="chart-card" aria-labelledby="progress-title">
+      <div class="chart-heading">
+        <div><span class="chart-icon pi pi-chart-bar" aria-hidden="true"></span><h3 id="progress-title">Avancement des projets</h3></div>
+        <p>Réalisé vs attendu selon le calendrier</p>
+      </div>
+      <div class="legend"><span><i class="swatch actual"></i>Réalisé</span><span><i class="swatch expected"></i>Attendu</span></div>
+      <div class="chart-scroll">
+        @for (project of progress; track $index) {
+          <div class="progress-item">
+            <div class="chart-label"><strong>{{ text(project['nom']) }}</strong><span>{{ percent(project['avancementReel']) }} / {{ percent(project['avancementAttendu']) }}</span></div>
+            <div class="progress-track" aria-hidden="true"><div class="progress-fill actual" [style.width.%]="width(project['avancementReel'])"></div></div>
+            <div class="progress-track" aria-hidden="true"><div class="progress-fill expected" [style.width.%]="width(project['avancementAttendu'])"></div></div>
+          </div>
+        } @empty {
+          <p class="chart-empty">Aucune donnée d’avancement disponible.</p>
+        }
+      </div>
+      <button pButton [text]="true" (click)="navigate.emit('projects')">Consulter les projets <i class="pi pi-arrow-right" aria-hidden="true"></i></button>
+    </section>
+
+    <section class="chart-card" aria-labelledby="budget-title">
+      <div class="chart-heading">
+        <div><span class="chart-icon pi pi-wallet" aria-hidden="true"></span><h3 id="budget-title">Consommation budgétaire</h3></div>
+        <p>Coût des heures validées par projet</p>
+      </div>
+      <div class="chart-scroll">
+        @for (project of budgets; track $index) {
+          <div class="budget-item">
+            <div class="chart-label"><strong>{{ text(project['nom']) }}</strong><b>{{ percent(project['taux']) }}</b></div>
+            <div class="progress-track budget-track" aria-hidden="true"><div class="progress-fill budget" [class.over-budget]="numeric(project['taux']) !== null && numeric(project['taux'])! > 100" [style.width.%]="width(project['taux'])"></div></div>
+            <small>{{ amount(project['budgetConsomme']) }} consommés / {{ amount(project['budgetTotal']) }}</small>
+          </div>
+        } @empty {
+          <p class="chart-empty">Aucune donnée budgétaire disponible.</p>
+        }
+      </div>
+    </section>
+  </div>
+
+  <section class="chart-card hours-card" aria-labelledby="hours-title">
+    <div class="chart-heading">
+      <div><span class="chart-icon pi pi-clock" aria-hidden="true"></span><h3 id="hours-title">Travail validé par semaine</h3></div>
+      <p>Heures des feuilles validées, regroupées par semaine de saisie — 8 dernières semaines</p>
+    </div>
+    @if (hoursLoading) {
+      <p class="chart-empty" role="status">Chargement des heures validées…</p>
+    } @else if (hoursError) {
+      <div class="chart-error" role="alert">Impossible d’afficher les heures validées : {{ hoursError }}
+        <button pButton [text]="true" (click)="loadHours()">Réessayer</button>
+      </div>
+    } @else if (maximumHours === 0) {
+      <p class="chart-empty">Aucune heure validée sur les 8 dernières semaines.</p>
+    } @else {
+      <div class="hours-chart" aria-label="Heures validées par semaine">
+        @for (week of weeks; track week.start) {
+          <div class="week-bar" [attr.aria-label]="'Semaine du ' + week.label + ' : ' + quantity(week.hours) + ' heures validées'">
+            <span class="week-value">{{ quantity(week.hours) }} h</span>
+            <div class="week-track"><div class="week-fill" [style.height.%]="weekHeight(week.hours)"></div></div>
+            <span class="week-label">{{ week.label }}</span>
+          </div>
+        }
+      </div>
+    }
+  </section>
+</section>

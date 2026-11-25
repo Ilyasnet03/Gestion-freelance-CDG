@@ -13,6 +13,7 @@ public class LigneTimesheetDto {
     private String projetNom;
     private LocalDate dateSaisie;
     private BigDecimal heures;
+    private String avertissement;
 
     public LigneTimesheetDto() {}
 
@@ -79,4 +80,7 @@ public class LigneTimesheetDto {
     public void setHeures(BigDecimal heures) {
         this.heures = heures;
     }
+
+    public String getAvertissement() { return avertissement; }
+    public void setAvertissement(String avertissement) { this.avertissement = avertissement; }
 }

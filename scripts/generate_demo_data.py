@@ -28,8 +28,6 @@ EXPECTED_ALERT_TYPES = {
     "DEPASSEMENT_BUDGET",
     "RETARD_PROJET",
     "TIMESHEET_EN_RETARD",
-    "ANOMALIE_SAISIE",
-    "SURCHARGE_FREELANCE",
 }
 
 SPECIALTIES = (
@@ -48,6 +46,16 @@ TASK_TITLES = (
     "Tests d'intégration et correction",
     "Documentation et transfert de compétences",
 )
+TASK_ESTIMATED_DAYS = (36, 45, 80, 65, 50, 40)
+PROJECT_PROGRESS_TARGETS = (72, 85, 68, 74, 78, 82)
+PROJECT_BUDGETS = (
+    Decimal("440000.00"),
+    Decimal("490000.00"),
+    Decimal("760000.00"),
+    Decimal("760000.00"),
+    Decimal("600000.00"),
+    Decimal("600000.00"),
+)
 PROJECT_THEMES = (
     "Modernisation du parcours épargne",
     "Portail de services numériques",
@@ -58,6 +66,25 @@ PROJECT_THEMES = (
 )
 MOROCCAN_CITIES = ("Rabat", "Casablanca", "Marrakech", "Tanger", "Agadir", "Fès")
 TIMESHEET_STATUSES = ("VALIDEE", "SOUMISE", "BROUILLON", "REJETEE")
+MANAGER_PERSONAS = (
+    ("Amine", "Benani"),
+    ("Leila", "Alaoui"),
+    ("Youssef", "Tazi"),
+)
+FREELANCE_PERSONAS = (
+    ("Sara", "El Mansouri", "Développement full-stack", 1050),
+    ("Omar", "Bennani", "Développement full-stack", 950),
+    ("Nadia", "Ait Lahcen", "Ingénierie data", 1150),
+    ("Walid", "Fassi", "Ingénierie data", 1050),
+    ("Imane", "Cherkaoui", "DevOps et cloud", 1200),
+    ("Yassine", "Khalil", "DevOps et cloud", 1100),
+    ("Meryem", "Ouazzani", "Cybersécurité", 1180),
+    ("Khalid", "Hamidi", "Cybersécurité", 1080),
+    ("Ines", "Raji", "UX/UI et accessibilité", 850),
+    ("Mehdi", "Saïdi", "UX/UI et accessibilité", 800),
+    ("Salma", "Boukri", "Pilotage de projets", 900),
+    ("Anas", "Lazrak", "Pilotage de projets", 850),
+)
 
 
 class DemoDataError(Exception):
@@ -103,10 +130,16 @@ def insert_id(cursor: Cursor) -> int:
 def demo_data_exists(cursor: Cursor) -> bool:
     cursor.execute(
         """
-        SELECT EXISTS (SELECT 1 FROM utilisateur WHERE email LIKE %s)
-            OR EXISTS (SELECT 1 FROM projet WHERE code LIKE %s)
+        SELECT EXISTS (SELECT 1 FROM projet WHERE code LIKE %s)
+            OR EXISTS (
+                SELECT 1
+                FROM timesheet t
+                JOIN freelance f ON f.id = t.freelance_id
+                JOIN utilisateur u ON u.id = f.utilisateur_id
+                WHERE u.email LIKE %s
+            )
         """,
-        (DEMO_EMAIL_PATTERN, PROJECT_CODE_PATTERN),
+        (PROJECT_CODE_PATTERN, DEMO_EMAIL_PATTERN),
     )
     row = cursor.fetchone()
     return bool(row and row[0])
@@ -170,11 +203,35 @@ def delete_demo_data(cursor: Cursor) -> None:
     )
     cursor.execute("DELETE FROM projet WHERE code LIKE %s", (PROJECT_CODE_PATTERN,))
     cursor.execute(
-        "DELETE FROM freelance WHERE utilisateur_id IN "
-        "(SELECT id FROM utilisateur WHERE email LIKE %s)",
+        """
+        DELETE FROM freelance f
+        WHERE f.utilisateur_id IN (
+            SELECT id FROM utilisateur WHERE email LIKE %s
+        )
+          AND NOT EXISTS (
+            SELECT 1 FROM affectation a WHERE a.freelance_id = f.id
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM ligne_timesheet l
+            JOIN timesheet t ON t.id = l.timesheet_id
+            WHERE t.freelance_id = f.id
+          )
+        """,
         (DEMO_EMAIL_PATTERN,),
     )
-    cursor.execute("DELETE FROM utilisateur WHERE email LIKE %s", (DEMO_EMAIL_PATTERN,))
+    cursor.execute(
+        """
+        DELETE FROM utilisateur u
+        WHERE u.email LIKE %s
+          AND NOT EXISTS (
+            SELECT 1 FROM projet p WHERE p.chef_projet_id = u.id
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM freelance f WHERE f.utilisateur_id = u.id
+          )
+        """,
+        (DEMO_EMAIL_PATTERN,),
+    )
 
 
 def one_year_ago(today: date) -> date:
@@ -225,6 +282,19 @@ def create_user(
     role: str,
     password_hash: str,
 ) -> int:
+    cursor.execute("SELECT id FROM utilisateur WHERE email = %s", (email,))
+    existing = cursor.fetchone()
+    if existing is not None:
+        user_id = int(existing[0])
+        cursor.execute(
+            """
+            UPDATE utilisateur
+            SET nom = %s, prenom = %s, mot_de_passe = %s, role = %s, actif = TRUE
+            WHERE id = %s
+            """,
+            (last_name, first_name, password_hash, role, user_id),
+        )
+        return user_id
     cursor.execute(
         """
         INSERT INTO utilisateur (nom, prenom, email, mot_de_passe, role, actif)
@@ -244,8 +314,8 @@ def create_demo_users(
 ) -> tuple[int, list[int], list[int], list[str], list[str], list[str]]:
     admin_id = create_user(
         cursor,
-        fake.first_name(),
-        fake.last_name(),
+        "Siham",
+        "Moussaoui",
         DEMO_ADMIN_EMAIL,
         "ADMIN",
         password_hash,
@@ -253,13 +323,13 @@ def create_demo_users(
 
     manager_ids: list[int] = []
     manager_emails: list[str] = []
-    for index in range(1, 4):
+    for index, (prenom, nom) in enumerate(MANAGER_PERSONAS, start=1):
         email = f"demo-chef-{index:02d}@demo.cdg.ma"
         manager_ids.append(
             create_user(
                 cursor,
-                fake.first_name(),
-                fake.last_name(),
+                prenom,
+                nom,
                 email,
                 "CHEF_PROJET",
                 password_hash,
@@ -269,26 +339,43 @@ def create_demo_users(
 
     freelance_ids: list[int] = []
     freelance_emails: list[str] = []
-    for index in range(1, 13):
+    for index, (prenom, nom, specialite, tjm_value) in enumerate(FREELANCE_PERSONAS, start=1):
         email = f"demo-freelance-{index:02d}@demo.cdg.ma"
         user_id = create_user(
             cursor,
-            fake.first_name(),
-            fake.last_name(),
+            prenom,
+            nom,
             email,
             "FREELANCE",
             password_hash,
         )
-        tjm = Decimal(str(rng.randint(4500, 7500))).quantize(Decimal("0.01"))
+        tjm = Decimal(str(tjm_value)).quantize(Decimal("0.01"))
         cursor.execute(
+            "SELECT id FROM freelance WHERE utilisateur_id = %s",
+            (user_id,),
+        )
+        existing_freelance = cursor.fetchone()
+        if existing_freelance is not None:
+            cursor.execute(
+                """
+                UPDATE freelance
+                SET tjm = %s, specialite = %s, statut = 'ACTIF'
+                WHERE utilisateur_id = %s
+                """,
+                (tjm, specialite, user_id),
+            )
+            freelance_id = int(existing_freelance[0])
+        else:
+            cursor.execute(
             """
             INSERT INTO freelance (utilisateur_id, tjm, specialite, statut)
             VALUES (%s, %s, %s, 'ACTIF')
             RETURNING id
             """,
-            (user_id, tjm, rng.choice(SPECIALTIES)),
-        )
-        freelance_ids.append(insert_id(cursor))
+                (user_id, tjm, specialite),
+            )
+            freelance_id = insert_id(cursor)
+        freelance_ids.append(freelance_id)
         freelance_emails.append(email)
 
     return (
@@ -318,15 +405,6 @@ def create_projects_and_tasks(
         )
     project_type_ids = [int(row[0]) for row in type_rows]
 
-    budgets = (
-        Decimal("350000.00"),
-        Decimal("650000.00"),
-        Decimal("2200000.00"),
-        Decimal("2200000.00"),
-        Decimal("2500000.00"),
-        Decimal("2500000.00"),
-    )
-    target_progress = (20, 27, 34, 40, 50, 60)
     end_offsets = (30, 45, 60, 90, 150, 240)
     projects: list[dict[str, Any]] = []
     applied_tjms: list[Decimal] = [Decimal("0.00")] * len(freelance_ids)
@@ -351,7 +429,7 @@ def create_projects_and_tasks(
                 project_code,
                 project_name,
                 description,
-                budgets[project_index],
+                PROJECT_BUDGETS[project_index],
                 start_date,
                 project_end,
                 rng.choice(project_type_ids),
@@ -385,13 +463,10 @@ def create_projects_and_tasks(
             )
             affectation_id = insert_id(cursor)
             task_ids: list[int] = []
-            progress = max(
-                0,
-                min(100, target_progress[project_index] + rng.randint(-3, 3)),
-            )
-            task_status = "TERMINEE" if progress == 100 else "EN_COURS" if progress else "A_FAIRE"
-
             for task_index, title in enumerate(TASK_TITLES):
+                charge_estimee = Decimal(str(TASK_ESTIMATED_DAYS[task_index])).quantize(
+                    Decimal("0.1")
+                )
                 cursor.execute(
                     """
                     INSERT INTO tache
@@ -404,9 +479,9 @@ def create_projects_and_tasks(
                         project_id,
                         affectation_id,
                         f"{title} - lot {task_index + 1}",
-                        Decimal(str(rng.randint(40, 120))).quantize(Decimal("0.1")),
-                        progress,
-                        task_status,
+                        charge_estimee,
+                        0,
+                        "A_FAIRE",
                         start_date,
                         project_end,
                     ),
@@ -458,7 +533,15 @@ def create_timesheets(
         task_ids = project["tasks"][freelance_index]
 
         for week_index, week_start in enumerate(week_starts):
-            status = TIMESHEET_STATUSES[(week_index + freelance_index) % len(TIMESHEET_STATUSES)]
+            weeks_elapsed = (today - week_start).days // 7
+            if weeks_elapsed > 8:
+                status = "VALIDEE"
+            elif weeks_elapsed == 8:
+                status = ("VALIDEE", "SOUMISE", "REJETEE")[freelance_index % 3]
+            elif weeks_elapsed <= 1:
+                status = ("BROUILLON", "SOUMISE", "REJETEE")[freelance_index % 3]
+            else:
+                status = ("VALIDEE", "VALIDEE", "SOUMISE", "REJETEE")[week_index % 4]
             submit_at = submission_time(week_start, now)
             decision_at = min(submit_at + timedelta(days=2), now)
             motif = (
@@ -496,7 +579,9 @@ def create_timesheets(
                 entry_date = week_start + timedelta(days=day_index)
                 if entry_date > today:
                     break
-                hours = Decimal(str(rng.randint(75, 85))) / Decimal("10")
+                hours_pattern = (Decimal("7.50"), Decimal("8.00"), Decimal("7.75"),
+                                 Decimal("8.25"), Decimal("7.25"))
+                hours = hours_pattern[day_index]
                 task_id = task_ids[(week_index + day_index) % len(task_ids)]
                 cursor.execute(
                     """
@@ -549,9 +634,7 @@ def prepare_analysis_examples(
     if workload_sheet_id is None:
         raise DemoDataError("La timesheet de démonstration de surcharge est introuvable.")
 
-    workload_hours = (
-        Decimal("52.50") / Decimal(len(workload_days))
-    ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    workload_hours = Decimal("9.50")
     workload_project = projects[0]
     workload_manager = int(workload_project["manager_id"])
     workload_submit = submission_time(workload_week, now)
@@ -672,6 +755,97 @@ def create_pvs_and_payments(
     return pv_count, payment_count
 
 
+def align_demo_project_metrics(cursor: Cursor, projects: list[dict[str, Any]]) -> None:
+    """Align demo metrics inside the caller's transaction, which must roll back on error."""
+    for project_index, project in enumerate(projects):
+        project_id = int(project["id"])
+        cursor.execute(
+            "SELECT id FROM projet WHERE id = %s AND code LIKE %s FOR UPDATE",
+            (project_id, PROJECT_CODE_PATTERN),
+        )
+        if cursor.fetchone() is None:
+            raise DemoDataError("Le projet à aligner n'est pas un projet DEMO.")
+        target = Decimal(PROJECT_PROGRESS_TARGETS[project_index]) / Decimal("100")
+        cursor.execute(
+            """
+            SELECT t.id, COALESCE(SUM(l.heures) FILTER (WHERE ts.statut = 'VALIDEE'), 0),
+                   u.email, a.projet_id
+            FROM tache t
+            LEFT JOIN affectation a ON a.id = t.affectation_id
+            LEFT JOIN freelance f ON f.id = a.freelance_id
+            LEFT JOIN utilisateur u ON u.id = f.utilisateur_id
+            LEFT JOIN ligne_timesheet l ON l.tache_id = t.id
+            LEFT JOIN timesheet ts ON ts.id = l.timesheet_id
+            WHERE t.projet_id = %s
+            GROUP BY t.id, u.email, a.projet_id
+            """,
+            (project_id,),
+        )
+        tasks = cursor.fetchall()
+        if not tasks:
+            raise DemoDataError("Le projet DEMO ne contient aucune tâche.")
+        weighted_progress = Decimal("0")
+        total_days = Decimal("0")
+        for task_id, hours, email, assignment_project_id in tasks:
+            if (
+                not email
+                or not email.startswith("demo-")
+                or not email.endswith("@demo.cdg.ma")
+                or assignment_project_id != project_id
+            ):
+                raise DemoDataError("Une tâche du projet DEMO n'appartient pas à une affectation DEMO.")
+            hours = Decimal(hours)
+            days = max(
+                Decimal("0.1"),
+                (hours / (Decimal("8") * target)).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP),
+            )
+            ratio = (hours / (days * Decimal("8"))).quantize(
+                Decimal("0.0001"), rounding=ROUND_HALF_UP
+            )
+            progress = min(100, int((ratio * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)))
+            status = "TERMINEE" if progress == 100 else "EN_COURS" if progress else "A_FAIRE"
+            cursor.execute(
+                "UPDATE tache SET charge_estimee = %s, avancement = %s, statut = %s WHERE id = %s",
+                (days, progress, status, task_id),
+            )
+            total_days += days
+            weighted_progress += days * progress
+
+        cursor.execute(
+            """
+            SELECT ts.id, pv.montant, COUNT(DISTINCT t.projet_id),
+                   BOOL_AND(ts.freelance_id = a.freelance_id)
+            FROM timesheet ts
+            JOIN ligne_timesheet l ON l.timesheet_id = ts.id
+            JOIN tache t ON t.id = l.tache_id
+            LEFT JOIN affectation a ON a.id = t.affectation_id
+            LEFT JOIN pv_reception pv ON pv.timesheet_id = ts.id
+            WHERE ts.statut = 'VALIDEE' AND ts.id IN (
+                SELECT l2.timesheet_id FROM ligne_timesheet l2
+                JOIN tache t2 ON t2.id = l2.tache_id WHERE t2.projet_id = %s
+            )
+            GROUP BY ts.id, pv.montant
+            """,
+            (project_id,),
+        )
+        sheets = cursor.fetchall()
+        if not sheets or any(amount is None or count != 1 or valid is not True
+                             for _, amount, count, valid in sheets):
+            raise DemoDataError("Les feuilles DEMO validées doivent avoir un PV et ne couvrir qu'une affectation du projet.")
+        consumed = sum((Decimal(amount) for _, amount, _, _ in sheets), Decimal("0"))
+        if consumed <= 0 or weighted_progress <= 0:
+            raise DemoDataError("Impossible d'aligner un projet DEMO sans heures validées ou coût positif.")
+        budget = (consumed * total_days * 100 / weighted_progress).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        cursor.execute(
+            "UPDATE projet SET budget = %s WHERE id = %s AND code LIKE %s",
+            (budget, project_id, PROJECT_CODE_PATTERN),
+        )
+        if cursor.rowcount != 1:
+            raise DemoDataError("Le projet à aligner n'est pas un projet DEMO.")
+
+
 def verify_analysis_conditions(cursor: Cursor, today: date) -> None:
     budget_projects = (
         f"DEMO-{today.year}-001",
@@ -703,7 +877,7 @@ def verify_analysis_conditions(cursor: Cursor, today: date) -> None:
         budget_rates[str(code)] = (
             Decimal(str(consumed)) * Decimal("100") / Decimal(str(budget))
         )
-    if any(budget_rates.get(code, Decimal("0")) < Decimal("80") for code in budget_projects):
+    if budget_rates.get(budget_projects[1], Decimal("0")) < Decimal("80"):
         raise DemoDataError("Les données ne déclencheraient pas l'alerte de budget.")
 
     cursor.execute(
@@ -757,45 +931,6 @@ def verify_analysis_conditions(cursor: Cursor, today: date) -> None:
     )
     if not bool(cursor.fetchone()[0]):
         raise DemoDataError("Les données ne déclencheraient pas l'alerte de timesheet en retard.")
-
-    recent_cutoff = today - timedelta(days=6)
-    cursor.execute(
-        """
-        SELECT EXISTS (
-            SELECT 1
-            FROM ligne_timesheet
-            JOIN timesheet ON timesheet.id = ligne_timesheet.timesheet_id
-            JOIN tache ON tache.id = ligne_timesheet.tache_id
-            JOIN projet ON projet.id = tache.projet_id
-            WHERE projet.code LIKE %s
-              AND ligne_timesheet.date_saisie >= %s
-            GROUP BY timesheet.freelance_id, ligne_timesheet.date_saisie
-            HAVING SUM(ligne_timesheet.heures) > 10
-        )
-        """,
-        (PROJECT_CODE_PATTERN, recent_cutoff),
-    )
-    if not bool(cursor.fetchone()[0]):
-        raise DemoDataError("Les données ne déclencheraient pas l'alerte d'anomalie journalière.")
-
-    cursor.execute(
-        """
-        SELECT EXISTS (
-            SELECT 1
-            FROM ligne_timesheet
-            JOIN timesheet ON timesheet.id = ligne_timesheet.timesheet_id
-            JOIN tache ON tache.id = ligne_timesheet.tache_id
-            JOIN projet ON projet.id = tache.projet_id
-            WHERE projet.code LIKE %s
-              AND ligne_timesheet.date_saisie >= %s
-            GROUP BY timesheet.freelance_id, timesheet.semaine_debut
-            HAVING SUM(ligne_timesheet.heures) > 48
-        )
-        """,
-        (PROJECT_CODE_PATTERN, recent_cutoff),
-    )
-    if not bool(cursor.fetchone()[0]):
-        raise DemoDataError("Les données ne déclencheraient pas l'alerte de surcharge hebdomadaire.")
 
 
 def generate_dataset(
@@ -855,6 +990,7 @@ def generate_dataset(
         today,
         rng,
     )
+    align_demo_project_metrics(cursor, projects)
     verify_analysis_conditions(cursor, today)
     cursor.execute(
         "SELECT COUNT(*) FROM ligne_timesheet WHERE timesheet_id IN "
@@ -983,7 +1119,7 @@ def main() -> int:
     parser.add_argument(
         "--run-analysis",
         action="store_true",
-        help="Lance l'analyse Java et vérifie que les cinq types d'alerte sont présents.",
+        help="Lance l'analyse Java et vérifie les alertes de budget, retard et validation.",
     )
     parser.add_argument(
         "--api-url",
@@ -1023,7 +1159,7 @@ def main() -> int:
             raise DemoDataError(
                 f"Les données sont enregistrées, mais l'analyse n'a pas abouti : {error}"
             ) from error
-        print("\nCinq types d'alerte vérifiés sur les projets DEMO.")
+        print("\nAlertes de budget, retard et validation vérifiées sur les projets DEMO.")
         print(json.dumps(result, ensure_ascii=False, indent=2))
     elif not args.dry_run:
         print(

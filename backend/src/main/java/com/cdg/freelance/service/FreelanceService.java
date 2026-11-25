@@ -102,8 +102,15 @@ public class FreelanceService {
                 && f.getTjm().compareTo(req.getTjm()) != 0) {
             throw new AccessDeniedException("Seul un administrateur peut modifier le TJM de référence");
         }
+        if (currentUser.getRole() == Role.CHEF_PROJET && req.getSeuilHeuresJour() != null
+                && f.getSeuilHeuresJour().compareTo(req.getSeuilHeuresJour()) != 0) {
+            throw new AccessDeniedException("Seul un administrateur peut modifier le seuil journalier");
+        }
         if (currentUser.getRole() == Role.ADMIN) {
             f.setTjm(req.getTjm());
+            if (req.getSeuilHeuresJour() != null) {
+                f.setSeuilHeuresJour(req.getSeuilHeuresJour());
+            }
         }
         if (req.getSpecialite() != null) {
             f.setSpecialite(req.getSpecialite());

@@ -16,7 +16,7 @@ public class AddLigneRequest {
 
     @NotNull(message = "Le nombre d'heures est obligatoire")
     @DecimalMin(value = "0.01", message = "Le nombre d'heures doit être supérieur à 0")
-    @DecimalMax(value = "24.00", message = "Le nombre d'heures par ligne ne peut dépasser 24 h")
+    @DecimalMax(value = "10.00", message = "Le nombre d'heures par ligne ne peut dépasser 10 h")
     private BigDecimal heures;
 
     public AddLigneRequest() {}

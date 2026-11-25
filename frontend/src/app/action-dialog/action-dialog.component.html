@@ -1,7 +1,5 @@
-<h2 mat-dialog-title>{{ data.title }}</h2>
-
 <form [formGroup]="form" (ngSubmit)="submit()">
-  <mat-dialog-content>
+  <div class="dialog-content">
     @if (data.description) {
       <p class="dialog-description">{{ data.description }}</p>
     }
@@ -10,19 +8,18 @@
       <div class="dialog-grid">
         @for (field of data.fields; track field.key) {
             @if (isVisible(field)) {
-              <mat-form-field appearance="outline" [class.full-width]="field.type === 'textarea'">
-                <mat-label>{{ field.label }}</mat-label>
+              <div class="dialog-field" [class.full-width]="field.type === 'textarea'">
+                <label [for]="'field-' + field.key">{{ field.label }}@if (field.required) { <span aria-hidden="true"> *</span> }</label>
                 @if (field.type === 'select') {
-                  <mat-select [formControlName]="field.key">
-                    @for (option of field.options ?? []; track option.value) {
-                      <mat-option [value]="option.value">{{ option.label }}</mat-option>
-                    }
-                  </mat-select>
+                  <p-select [inputId]="'field-' + field.key" [options]="field.options ?? []"
+                    optionLabel="label" optionValue="value" [formControlName]="field.key"
+                    [ariaLabel]="field.label" appendTo="body" placeholder="Sélectionner" />
                 } @else if (field.type === 'textarea') {
-                  <textarea matInput [formControlName]="field.key" rows="3"></textarea>
+                  <textarea pTextarea [id]="'field-' + field.key" [formControlName]="field.key" rows="3"></textarea>
                 } @else {
                   <input
-                    matInput
+                    pInputText
+                    [id]="'field-' + field.key"
                     [type]="field.type"
                     [formControlName]="field.key"
                     [min]="field.min ?? null"
@@ -31,27 +28,27 @@
                   >
                 }
                 @if (field.hint) {
-                  <mat-hint>{{ field.hint }}</mat-hint>
+                  <small class="dialog-hint">{{ field.hint }}</small>
                 }
                 @if (control(field).touched && control(field).invalid) {
-                  <mat-error>{{ errorText(field) }}</mat-error>
+                  <small class="dialog-error" role="alert">{{ errorText(field) }}</small>
                 }
-              </mat-form-field>
+              </div>
             }
         }
       </div>
     }
-  </mat-dialog-content>
+  </div>
 
-  <mat-dialog-actions align="end">
-    <button mat-button type="button" mat-dialog-close>Annuler</button>
+  <div class="dialog-actions">
+    <button pButton type="button" severity="secondary" [text]="true" (click)="cancel()">Annuler</button>
     <button
-      mat-flat-button
-      [color]="data.danger ? 'warn' : 'primary'"
+      pButton
+      [severity]="data.danger ? 'danger' : 'primary'"
       type="submit"
       [disabled]="data.fields.length > 0 && hasVisibleErrors()"
     >
       {{ data.submitLabel ?? 'Enregistrer' }}
     </button>
-  </mat-dialog-actions>
+  </div>
 </form>

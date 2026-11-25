@@ -142,6 +142,8 @@ public class DataInitializer implements CommandLineRunner {
         p1.setNom("Portail Numérique Épargne & Prévoyance CDG");
         p1.setDescription("Refonte du portail web adhérents avec espace personnel et déclaration en ligne.");
         p1.setBudget(new BigDecimal("350000.00"));
+        p1.setHeuresPrevues(new BigDecimal("400.00"));
+        p1.setNombreTachesPrevues(2);
         p1.setDateDebut(LocalDate.now().minusMonths(2));
         p1.setDateFinPrevue(LocalDate.now().plusMonths(4));
         p1.setStatut(ProjetStatut.EN_COURS);

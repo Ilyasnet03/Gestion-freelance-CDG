@@ -4,22 +4,16 @@ import {
   Component,
   DestroyRef,
   OnInit,
-  TemplateRef,
-  ViewChild,
   inject,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
-import {
-  MatDialog,
-  MatDialogModule,
-  MatDialogRef,
-} from '@angular/material/dialog';
-import { MatMenuModule } from '@angular/material/menu';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { MatTableModule } from '@angular/material/table';
+import { ButtonModule } from 'primeng/button';
+import { DialogModule } from 'primeng/dialog';
+import { DialogService } from 'primeng/dynamicdialog';
+import { PopoverModule } from 'primeng/popover';
+import { ProgressBarModule } from 'primeng/progressbar';
+import { TableModule } from 'primeng/table';
 import { NavigationEnd, Router } from '@angular/router';
 import { filter, firstValueFrom } from 'rxjs';
 import {
@@ -31,6 +25,7 @@ import {
 import { ApiRow, ApiService, AuthUser } from './api.service';
 import { AuthService } from './auth.service';
 import { LandingPageComponent } from './landing/landing-page.component';
+import { AdminDashboardComponent } from './admin-dashboard/admin-dashboard.component';
 
 type ViewId =
   | 'dashboard'
@@ -55,19 +50,25 @@ interface Column {
   label: string;
 }
 
+interface ViewCache {
+  rows: ApiRow[];
+  secondaryRows: ApiRow[];
+  dashboard: ApiRow | null;
+}
+
 @Component({
   selector: 'app-root',
   standalone: true,
   imports: [
     CommonModule,
     FormsModule,
-    MatButtonModule,
-    MatCardModule,
-    MatDialogModule,
-    MatMenuModule,
-    MatProgressBarModule,
-    MatTableModule,
+    ButtonModule,
+    DialogModule,
+    PopoverModule,
+    ProgressBarModule,
+    TableModule,
     LandingPageComponent,
+    AdminDashboardComponent,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
@@ -75,13 +76,14 @@ interface Column {
 export class App implements OnInit {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
-  private readonly dialog = inject(MatDialog);
+  private readonly dialog = inject(DialogService);
   private readonly changeDetectorRef = inject(ChangeDetectorRef);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
-  private detailDialogRef: MatDialogRef<unknown> | null = null;
-
-  @ViewChild('detailDialog') private detailDialogTemplate?: TemplateRef<unknown>;
+  detailDialogVisible = false;
+  hoursWarning = '';
+  private pendingConfirmation = false;
+  private actionInProgress = false;
 
   readonly menu: MenuItem[] = [
     { id: 'dashboard', title: "Vue d'ensemble", roles: ['ADMIN', 'CHEF_PROJET'] },
@@ -105,19 +107,22 @@ export class App implements OnInit {
       { key: 'dateDebut', label: 'Début' },
       { key: 'dateFinPrevue', label: 'Fin prévue' },
       { key: 'budget', label: 'Budget' },
+      { key: 'heuresPrevues', label: 'Heures prévues' },
       { key: 'avancementGlobal', label: 'Avancement' },
     ],
     freelancers: [
       { key: 'nomComplet', label: 'Freelance' },
       { key: 'specialite', label: 'Spécialité' },
       { key: 'tjm', label: 'TJM' },
+      { key: 'seuilHeuresJour', label: 'Seuil journalier' },
       { key: 'statut', label: 'Statut' },
       { key: 'email', label: 'E-mail' },
     ],
     'my-missions': [
       { key: 'projetNom', label: 'Projet' },
       { key: 'titre', label: 'Tâche' },
-      { key: 'chargeEstimee', label: 'Charge estimée (jours)' },
+      { key: 'heuresPrevues', label: 'Heures prévues' },
+      { key: 'heuresSaisies', label: 'Heures saisies' },
       { key: 'avancement', label: 'Avancement' },
       { key: 'statut', label: 'Statut' },
       { key: 'dateDebut', label: 'Début' },
@@ -175,6 +180,7 @@ export class App implements OnInit {
   detailRows: ApiRow[] = [];
   detailTitle = '';
   dashboard: ApiRow | null = null;
+  dashboardRefreshVersion = 0;
   projectTypes: ApiRow[] = [];
   loading = false;
   isDashboardRoute = false;
@@ -186,10 +192,26 @@ export class App implements OnInit {
   password = '';
   error = '';
   notice = '';
+  timesheetStatusFilter = '';
   selectedSheet: ApiRow | null = null;
   selectedProject: ApiRow | null = null;
   taskOptions: ApiRow[] = [];
   projectAssignments: ApiRow[] = [];
+  private readonly viewCache = new Map<string, ViewCache>();
+  private readonly activeViewLoads = new Map<string, Promise<void>>();
+  private viewLoadGeneration = 0;
+
+  private invalidateViewCaches(...views: ViewId[]): void {
+    if (!views.length) {
+      this.viewCache.clear();
+      return;
+    }
+    for (const key of [...this.viewCache.keys()]) {
+      if (views.some((view) => key === view || key.startsWith(`${view}:`))) {
+        this.viewCache.delete(key);
+      }
+    }
+  }
 
   get title(): string {
     return this.menu.find((item) => item.id === this.currentView)?.title ?? '';
@@ -277,7 +299,8 @@ export class App implements OnInit {
       return [
         { key: 'titre', label: 'Tâche' },
         { key: 'projetNom', label: 'Projet' },
-        { key: 'chargeEstimee', label: 'Charge estimée (jours)' },
+        { key: 'heuresPrevues', label: 'Heures prévues' },
+        { key: 'heuresSaisies', label: 'Heures saisies' },
         { key: 'avancement', label: 'Avancement' },
         { key: 'statut', label: 'Statut' },
         { key: 'dateDebut', label: 'Début' },
@@ -320,6 +343,13 @@ export class App implements OnInit {
     this.language = value === 'AR' ? 'AR' : value === 'EN' ? 'EN' : 'FR';
     document.documentElement.lang = this.language.toLowerCase();
     document.documentElement.dir = this.language === 'AR' ? 'rtl' : 'ltr';
+  }
+
+  setTimesheetStatusFilter(value: string): void {
+    this.timesheetStatusFilter =
+      ['BROUILLON', 'SOUMISE', 'VALIDEE', 'REJETEE'].includes(value) ? value : '';
+    this.invalidateViewCaches('timesheets');
+    void this.loadView();
   }
 
   get columnKeys(): string[] {
@@ -399,84 +429,142 @@ export class App implements OnInit {
     this.password = '';
     this.rows = [];
     this.dashboard = null;
+    this.viewCache.clear();
   }
 
   async selectView(view: ViewId): Promise<void> {
     this.currentView = view;
     this.menuOpen = false;
     this.detailRows = [];
+    this.changeDetectorRef.markForCheck();
     await this.loadView();
   }
 
   async loadView(): Promise<void> {
     this.ensureAccessibleView();
-    this.loading = true;
-    this.error = '';
-    try {
-      switch (this.currentView) {
-        case 'dashboard':
-          [this.dashboard, this.rows] = await Promise.all([
-            this.api.get<ApiRow>('/api/dashboard/kpi'),
-            this.api.get<ApiRow[]>('/api/projets'),
-          ]);
-          break;
-        case 'projects':
-          this.rows = await this.api.get<ApiRow[]>('/api/projets');
-          break;
-        case 'freelancers':
-          this.rows = await this.api.get<ApiRow[]>('/api/freelances');
-          break;
-        case 'my-missions':
-          this.rows = await this.api.get<ApiRow[]>('/api/mes-missions');
-          break;
-        case 'timesheets':
-          this.rows = await this.api.get<ApiRow[]>('/api/timesheets');
-          if (this.user?.role !== 'FREELANCE') {
-            const payments = await this.api.get<ApiRow[]>('/api/paiements');
-            const paymentsByTimesheet = new Map(
-              payments.map((payment) => [this.number(payment, 'timesheetId'), payment]),
-            );
-            this.rows = this.rows.map((sheet) => {
-              const payment = paymentsByTimesheet.get(this.number(sheet, 'id'));
-              return payment
-                ? {
-                    ...sheet,
-                    paiementId: this.number(payment, 'id'),
-                    paiementStatut: this.text(payment, 'statut'),
-                  }
-                : sheet;
-            });
-          }
-          break;
-        case 'billing':
-          [this.secondaryRows, this.rows] = await Promise.all([
-            this.api.get<ApiRow[]>('/api/pv'),
-            this.api.get<ApiRow[]>('/api/paiements'),
-          ]);
-          break;
-        case 'my-pvs':
-          this.rows = await this.api.get<ApiRow[]>('/api/pv');
-          break;
-        case 'analysis':
-          this.rows = await this.api.get<ApiRow[]>('/api/alertes');
-          break;
-        case 'users':
-          this.rows = await this.api.get<ApiRow[]>('/api/admin/utilisateurs');
-          break;
-        case 'settings':
-          [this.rows, this.secondaryRows] = await Promise.all([
-            this.api.get<ApiRow[]>('/api/admin/parametres'),
-            this.api.get<ApiRow[]>('/api/admin/types-projet'),
-          ]);
-          break;
-      }
-
-    } catch (error: unknown) {
-      this.setError(error);
-      if (!this.api.token) this.logout();
-    } finally {
+    const generation = ++this.viewLoadGeneration;
+    const requestedView = this.currentView;
+    const requestedTimesheetStatus = this.timesheetStatusFilter;
+    const cacheKey = requestedView === 'timesheets'
+      ? `timesheets:${requestedTimesheetStatus}`
+      : requestedView;
+    const existingLoad = this.activeViewLoads.get(cacheKey);
+    if (existingLoad) {
+      await existingLoad;
+      return;
+    }
+    const cached = this.viewCache.get(cacheKey);
+    if (cached) {
+      this.rows = cached.rows;
+      this.secondaryRows = cached.secondaryRows;
+      this.dashboard = cached.dashboard;
       this.loading = false;
       this.changeDetectorRef.markForCheck();
+    } else {
+      this.loading = true;
+      this.changeDetectorRef.markForCheck();
+    }
+    this.error = '';
+    const load = (async () => {
+      try {
+        let dashboard: ApiRow | null = null;
+        let rows: ApiRow[] = [];
+        let secondaryRows: ApiRow[] = [];
+
+        switch (requestedView) {
+          case 'dashboard':
+            [dashboard, rows] = await Promise.all([
+              this.api.get<ApiRow>('/api/dashboard/kpi'),
+              this.api.get<ApiRow[]>('/api/projets'),
+            ]);
+            break;
+          case 'projects':
+            rows = await this.api.get<ApiRow[]>('/api/projets');
+            break;
+          case 'freelancers':
+            rows = await this.api.get<ApiRow[]>('/api/freelances');
+            break;
+          case 'my-missions':
+            rows = await this.api.get<ApiRow[]>('/api/mes-missions');
+            break;
+          case 'timesheets': {
+            const timesheetPath = requestedTimesheetStatus
+              ? `/api/timesheets?statut=${encodeURIComponent(requestedTimesheetStatus)}`
+              : '/api/timesheets';
+            rows = await this.api.get<ApiRow[]>(timesheetPath);
+            if (this.user?.role !== 'FREELANCE') {
+              const payments = await this.api.get<ApiRow[]>('/api/paiements');
+              const paymentsByTimesheet = new Map(
+                payments.map((payment) => [this.number(payment, 'timesheetId'), payment]),
+              );
+              rows = rows.map((sheet) => {
+                const payment = paymentsByTimesheet.get(this.number(sheet, 'id'));
+                return payment
+                  ? {
+                      ...sheet,
+                      paiementId: this.number(payment, 'id'),
+                      paiementStatut: this.text(payment, 'statut'),
+                    }
+                  : sheet;
+              });
+            }
+            break;
+          }
+          case 'billing':
+            [secondaryRows, rows] = await Promise.all([
+              this.api.get<ApiRow[]>('/api/pv'),
+              this.api.get<ApiRow[]>('/api/paiements'),
+            ]);
+            break;
+          case 'my-pvs':
+            rows = await this.api.get<ApiRow[]>('/api/pv');
+            break;
+          case 'analysis':
+            rows = await this.api.get<ApiRow[]>('/api/alertes');
+            break;
+          case 'users':
+            rows = await this.api.get<ApiRow[]>('/api/admin/utilisateurs');
+            break;
+          case 'settings':
+            [rows, secondaryRows] = await Promise.all([
+              this.api.get<ApiRow[]>('/api/admin/parametres'),
+              this.api.get<ApiRow[]>('/api/admin/types-projet'),
+            ]);
+            break;
+        }
+
+        if (generation !== this.viewLoadGeneration || this.currentView !== requestedView) return;
+        this.rows = rows;
+        this.secondaryRows = secondaryRows;
+        if (dashboard !== null) {
+          this.dashboard = dashboard;
+          this.dashboardRefreshVersion++;
+        }
+        this.viewCache.set(cacheKey, {
+          rows: [...rows],
+          secondaryRows: [...secondaryRows],
+          dashboard,
+        });
+      } catch (error: unknown) {
+        if (generation === this.viewLoadGeneration && this.currentView === requestedView) {
+          this.setError(error);
+          if (!this.api.token) this.logout();
+        }
+      } finally {
+        if (generation === this.viewLoadGeneration && this.currentView === requestedView) {
+          this.loading = false;
+          this.changeDetectorRef.markForCheck();
+        }
+      }
+    })();
+
+    this.activeViewLoads.set(cacheKey, load);
+    try {
+      await load;
+    } finally {
+      if (this.activeViewLoads.get(cacheKey) === load) {
+        this.activeViewLoads.delete(cacheKey);
+      }
     }
   }
 
@@ -503,6 +591,8 @@ export class App implements OnInit {
         { key: 'code', label: 'Code du projet', type: 'text', required: true },
         { key: 'nom', label: 'Nom du projet', type: 'text', required: true },
         { key: 'budget', label: 'Budget (MAD)', type: 'number', required: true, min: 1, step: 0.01 },
+        { key: 'heuresPrevues', label: 'Heures prévues du projet', type: 'number', required: true, min: 0.01, step: 0.01 },
+        { key: 'nombreTachesPrevues', label: 'Nombre de tâches prévues', type: 'number', required: true, min: 1, step: 1 },
         { key: 'dateDebut', label: 'Date de début', type: 'date', required: true },
         { key: 'dateFinPrevue', label: 'Date de fin prévue', type: 'date', required: true },
         {
@@ -596,6 +686,8 @@ export class App implements OnInit {
           code: values['code'],
           nom: values['nom'],
           budget: Number(values['budget']),
+          heuresPrevues: Number(values['heuresPrevues']),
+          nombreTachesPrevues: Number(values['nombreTachesPrevues']),
           dateDebut: values['dateDebut'],
           dateFinPrevue: values['dateFinPrevue'],
           typeProjetId: Number(values['typeProjetId']),
@@ -618,6 +710,7 @@ export class App implements OnInit {
         });
       }
       this.notify('Enregistrement effectué.');
+      this.invalidateViewCaches();
       await this.loadView();
     } catch (error: unknown) {
       this.setError(error);
@@ -628,6 +721,7 @@ export class App implements OnInit {
     const id = this.number(row, 'id');
     await this.closeDetailsDialog();
     this.error = '';
+    this.hoursWarning = '';
     try {
       if (this.currentView === 'projects') {
         this.selectedProject = row;
@@ -649,7 +743,7 @@ export class App implements OnInit {
           ? (sheet['lignes'] as ApiRow[])
           : [];
         if (this.canEditSelectedSheet) {
-          this.taskOptions = await this.api.get<ApiRow[]>('/api/mes-missions');
+          this.taskOptions = await this.api.get<ApiRow[]>('/api/mes-missions?disponibles=true');
         } else {
           this.taskOptions = [];
         }
@@ -660,35 +754,17 @@ export class App implements OnInit {
     } catch (error: unknown) {
       this.setError(error);
     } finally {
+      this.actionInProgress = false;
       this.changeDetectorRef.markForCheck();
     }
   }
 
   private showDetailsDialog(): void {
-    if (!this.detailDialogTemplate) {
-      throw new Error('La fenêtre de détails n’est pas disponible.');
-    }
-
-    const ref = this.dialog.open(this.detailDialogTemplate, {
-      width: '900px',
-      maxWidth: 'calc(100vw - 32px)',
-      maxHeight: 'calc(100vh - 32px)',
-      autoFocus: 'first-tabbable',
-      restoreFocus: true,
-    });
-    this.detailDialogRef = ref;
-    ref.afterClosed().subscribe(() => {
-      if (this.detailDialogRef === ref) this.detailDialogRef = null;
-    });
+    this.detailDialogVisible = true;
   }
 
   private async closeDetailsDialog(): Promise<void> {
-    const ref = this.detailDialogRef;
-    if (!ref) return;
-
-    this.detailDialogRef = null;
-    ref.close();
-    await firstValueFrom(ref.afterClosed());
+    this.detailDialogVisible = false;
   }
 
   actionLabel(row: ApiRow): string {
@@ -739,6 +815,8 @@ export class App implements OnInit {
         reference: String(values['reference'] ?? '').trim() || null,
       });
       this.notify('Paiement confirmé.');
+      row['paiementStatut'] = 'PAYE';
+      this.invalidateViewCaches('billing', 'timesheets');
       await this.loadView();
     } catch (error: unknown) {
       this.setError(error);
@@ -761,32 +839,41 @@ export class App implements OnInit {
           submitLabel: 'Enregistrer',
           fields: [
             ...(this.user?.role === 'ADMIN'
-              ? [{ key: 'tjm', label: 'TJM (MAD)', type: 'number' as const, required: true, min: 0.01, step: 0.01 }]
+              ? [
+                  { key: 'tjm', label: 'TJM (MAD)', type: 'number' as const, required: true, min: 0.01, step: 0.01 },
+                  { key: 'seuilHeuresJour', label: "Seuil d'alerte (h/j)", type: 'number' as const, required: true, min: 0.01, max: 10, step: 0.01, hint: 'Au-delà de 10 h/j, la saisie est bloquée.' },
+                ]
               : []),
             { key: 'specialite', label: 'Spécialité', type: 'text', required: true },
           ],
           values: {
             tjm: this.number(row, 'tjm'),
+            seuilHeuresJour: this.number(row, 'seuilHeuresJour'),
             specialite: this.text(row, 'specialite'),
           },
         });
         if (!values) return;
         await this.api.put(`/api/freelances/${id}`, {
           tjm: this.user?.role === 'ADMIN' ? Number(values['tjm']) : this.number(row, 'tjm'),
+          ...(this.user?.role === 'ADMIN' ? { seuilHeuresJour: Number(values['seuilHeuresJour']) } : {}),
           specialite: String(values['specialite'] ?? ''),
           statut: this.text(row, 'statut'),
         });
+        this.invalidateViewCaches('freelancers');
         await this.loadView();
       } else if (this.currentView === 'timesheets') {
         const status = this.text(row, 'statut');
         if (status === 'SOUMISE' && this.user?.role === 'CHEF_PROJET') {
+          if (this.actionInProgress) return;
           const confirmed = await this.confirmAction(
             'Valider la feuille de temps ?',
             'Cette action validera la feuille et générera son procès-verbal de réception.',
-            'Valider la feuille',
+            'Confirmer la validation',
           );
           if (!confirmed) return;
-          await this.api.post(`/api/timesheets/${id}/valider`);
+          this.actionInProgress = true;
+          await this.api.post<ApiRow>(`/api/timesheets/${id}/valider`);
+          row['statut'] = 'VALIDEE';
           this.notify('Feuille validée.');
         } else if (
           this.user?.role === 'FREELANCE' &&
@@ -796,6 +883,7 @@ export class App implements OnInit {
         } else {
           await this.openDetails(row);
         }
+        this.invalidateViewCaches();
         await this.loadView();
       } else if (this.currentView === 'billing') {
         if (this.text(row, 'statut') === 'PAYE') return;
@@ -813,14 +901,20 @@ export class App implements OnInit {
           datePaiement: this.dateInputValue(new Date()),
           reference: String(values['reference'] ?? '').trim() || null,
         });
+        row['statut'] = 'PAYE';
+        this.invalidateViewCaches('billing', 'timesheets');
         await this.loadView();
       } else if (this.currentView === 'my-pvs') {
         await this.api.download(`/api/pv/${id}/pdf`, `PV-CDG-${id}.pdf`);
       } else if (this.currentView === 'analysis') {
         await this.api.patch(`/api/alertes/${id}/traitee`);
+        row['traitee'] = true;
+        this.invalidateViewCaches('analysis', 'dashboard');
         await this.loadView();
       } else if (this.currentView === 'users') {
         await this.api.patch(`/api/admin/utilisateurs/${id}/statut`);
+        row['actif'] = !this.bool(row, 'actif');
+        this.invalidateViewCaches('users');
         await this.loadView();
       } else if (this.currentView === 'settings') {
         const values = await this.showActionDialog({
@@ -834,30 +928,41 @@ export class App implements OnInit {
           cle: this.text(row, 'cle'),
           valeur: String(values['valeur'] ?? ''),
         });
+        row['valeur'] = String(values['valeur'] ?? '');
+        this.invalidateViewCaches('settings');
         await this.loadView();
       }
       this.notify('Action effectuée.');
     } catch (error: unknown) {
       this.setError(error);
     } finally {
+      this.actionInProgress = false;
       this.changeDetectorRef.markForCheck();
     }
   }
 
   async submitSheet(row: ApiRow): Promise<void> {
+    if (this.actionInProgress) return;
     const id = this.number(row, 'id');
-    const confirmed = await this.confirmAction(
-      'Soumettre cette feuille ?',
-      'La feuille sera transmise au chef de projet pour validation.',
-      'Soumettre',
-    );
-    if (!confirmed) return;
+    let confirmed = false;
     try {
-      await this.api.post(`/api/timesheets/${id}/soumettre`);
+      confirmed = await this.confirmAction(
+        'Soumettre cette feuille ?',
+        'La feuille sera transmise au chef de projet pour validation.',
+        'Confirmer la soumission',
+      );
+      if (!confirmed) return;
+      this.actionInProgress = true;
+      await this.api.post(`/api/timesheets/${id}/soumettre?confirmed=true`);
+      row['statut'] = 'SOUMISE';
       this.notify('Feuille soumise.');
+      this.invalidateViewCaches();
       await this.loadView();
     } catch (error: unknown) {
       this.setError(error);
+    } finally {
+      this.actionInProgress = false;
+      this.changeDetectorRef.markForCheck();
     }
   }
 
@@ -877,7 +982,9 @@ export class App implements OnInit {
       await this.api.post(`/api/timesheets/${this.number(row, 'id')}/rejeter`, {
         motif,
       });
+      row['statut'] = 'REJETEE';
       this.notify('Feuille rejetée.');
+      this.invalidateViewCaches();
       await this.loadView();
     } catch (error: unknown) {
       this.setError(error);
@@ -887,12 +994,12 @@ export class App implements OnInit {
   async addHours(): Promise<void> {
     if (!this.selectedSheet) return;
     if (!this.taskOptions.length) {
-      this.setError('Aucune tâche disponible pour cette feuille de temps.');
+      this.setError("Aucune tâche disponible : les heures prévues sont atteintes ou aucune mission n'est affectée.");
       return;
     }
     const values = await this.showActionDialog({
       title: 'Ajouter des heures',
-      description: 'Saisissez le temps consacré à une tâche pour cette journée.',
+      description: 'Saisissez le temps consacré à une tâche. Le total journalier ne peut dépasser 10 h.',
       submitLabel: 'Ajouter la saisie',
       fields: [
         {
@@ -902,17 +1009,19 @@ export class App implements OnInit {
           required: true,
           options: this.taskOptions.map((task) => ({
             value: this.number(task, 'id'),
-            label: `${this.text(task, 'titre')} — ${this.text(task, 'projetNom')}`,
+            label: `${this.text(task, 'titre')} — ${this.text(task, 'projetNom')} (${Math.max(0, this.number(task, 'heuresPrevues') - this.number(task, 'heuresSaisies')).toFixed(2)} h restantes)`,
           })),
         },
         { key: 'dateSaisie', label: 'Date', type: 'date', required: true },
-        { key: 'heures', label: 'Heures', type: 'number', required: true, min: 0.01, max: 24, step: 0.25 },
+        { key: 'heures', label: 'Heures', type: 'number', required: true, min: 0.01, max: 10, step: 0.25 },
       ],
       values: { dateSaisie: this.text(this.selectedSheet, 'semaineDebut') },
     });
     if (!values) return;
+    this.error = '';
+    this.hoursWarning = '';
     try {
-      await this.api.post(
+      const saved = await this.api.post<ApiRow>(
         `/api/timesheets/${this.number(this.selectedSheet, 'id')}/lignes`,
         {
           tacheId: Number(values['tacheId']),
@@ -921,7 +1030,9 @@ export class App implements OnInit {
         },
       );
       await this.openDetails(this.selectedSheet);
-      this.notify('Heures ajoutées.');
+      this.invalidateViewCaches('timesheets', 'projects', 'dashboard', 'my-missions');
+      this.hoursWarning = this.text(saved, 'avertissement');
+      if (!this.hoursWarning) this.notify('Heures ajoutées.');
     } catch (error: unknown) {
       this.setError(error);
     }
@@ -947,6 +1058,9 @@ export class App implements OnInit {
         await this.api.patch(`/api/taches/${this.number(row, 'id')}/avancement`, {
           avancement: progress,
         });
+        row['avancement'] = progress;
+        row['statut'] = progress === 100 ? 'TERMINEE' : progress > 0 ? 'EN_COURS' : 'A_FAIRE';
+        this.invalidateViewCaches('projects', 'dashboard', 'my-missions');
         if (this.selectedProject) await this.openDetails(this.selectedProject);
       } else if (this.selectedSheet) {
         const confirmed = await this.confirmAction(
@@ -960,6 +1074,7 @@ export class App implements OnInit {
           `/api/timesheets/${this.number(this.selectedSheet, 'id')}/lignes/${this.number(row, 'id')}`,
         );
         await this.openDetails(this.selectedSheet);
+        this.invalidateViewCaches('timesheets', 'projects', 'dashboard');
       }
     } catch (error: unknown) {
       this.setError(error);
@@ -1007,6 +1122,7 @@ export class App implements OnInit {
         },
       );
       await this.openDetails(this.selectedProject);
+      this.invalidateViewCaches('projects', 'dashboard', 'my-missions');
       this.notify('Freelance affecté au projet.');
     } catch (error: unknown) {
       this.setError(error);
@@ -1028,6 +1144,8 @@ export class App implements OnInit {
           { key: 'nom', label: 'Nom du projet', type: 'text', required: true },
           { key: 'description', label: 'Description', type: 'textarea' },
           { key: 'budget', label: 'Budget (MAD)', type: 'number', required: true, min: 1, step: 0.01 },
+          { key: 'heuresPrevues', label: 'Heures prévues du projet', type: 'number', required: true, min: 0.01, step: 0.01 },
+          { key: 'nombreTachesPrevues', label: 'Nombre de tâches prévues', type: 'number', required: true, min: 1, step: 1 },
           { key: 'dateDebut', label: 'Date de début', type: 'date', required: true },
           { key: 'dateFinPrevue', label: 'Date de fin prévue', type: 'date', required: true },
           {
@@ -1057,6 +1175,8 @@ export class App implements OnInit {
           nom: this.text(project, 'nom'),
           description: this.text(project, 'description'),
           budget: this.number(project, 'budget'),
+          heuresPrevues: project['heuresPrevues'] == null ? '' : this.number(project, 'heuresPrevues'),
+          nombreTachesPrevues: project['nombreTachesPrevues'] == null ? '' : this.number(project, 'nombreTachesPrevues'),
           dateDebut: this.text(project, 'dateDebut'),
           dateFinPrevue: this.text(project, 'dateFinPrevue'),
           typeProjetId: this.number(project, 'typeProjetId'),
@@ -1070,6 +1190,8 @@ export class App implements OnInit {
           nom: String(values['nom'] ?? '').trim(),
           description: values['description'] ?? '',
           budget: Number(values['budget']),
+          heuresPrevues: Number(values['heuresPrevues']),
+          nombreTachesPrevues: Number(values['nombreTachesPrevues']),
           dateDebut: values['dateDebut'],
           dateFinPrevue: values['dateFinPrevue'],
           typeProjetId: Number(values['typeProjetId']),
@@ -1079,6 +1201,7 @@ export class App implements OnInit {
       this.selectedProject = updated;
       this.detailTitle = `${this.text(updated, 'nom')} — tâches`;
       this.notify('Projet modifié.');
+      this.invalidateViewCaches('projects', 'dashboard');
       await this.loadView();
     } catch (error: unknown) {
       this.setError(error);
@@ -1093,7 +1216,7 @@ export class App implements OnInit {
       submitLabel: 'Enregistrer',
       fields: [
         { key: 'titre', label: 'Intitulé de la tâche', type: 'text', required: true },
-        { key: 'chargeEstimee', label: 'Charge estimée (jours)', type: 'number', required: true, min: 0, step: 0.25 },
+        { key: 'heuresPrevues', label: 'Heures prévues', type: 'number', required: true, min: 0.01, step: 0.01 },
         { key: 'avancement', label: 'Avancement (%)', type: 'number', required: true, min: 0, max: 100, step: 1 },
         {
           key: 'statut',
@@ -1111,7 +1234,7 @@ export class App implements OnInit {
       ],
       values: {
         titre: this.text(row, 'titre'),
-        chargeEstimee: this.number(row, 'chargeEstimee'),
+        heuresPrevues: this.number(row, 'heuresPrevues'),
         avancement: this.number(row, 'avancement'),
         statut: this.text(row, 'statut'),
         dateDebut: this.text(row, 'dateDebut'),
@@ -1131,7 +1254,7 @@ export class App implements OnInit {
       }
       await this.api.put(`/api/taches/${this.number(row, 'id')}`, {
         titre: String(values['titre'] ?? '').trim(),
-        chargeEstimee: Number(values['chargeEstimee']),
+        heuresPrevues: Number(values['heuresPrevues']),
         avancement: progress,
         statut: status,
         affectationId: this.number(row, 'affectationId') || null,
@@ -1140,6 +1263,7 @@ export class App implements OnInit {
       });
       await this.openDetails(this.selectedProject);
       this.notify('Tâche modifiée.');
+      this.invalidateViewCaches('projects', 'dashboard', 'my-missions');
     } catch (error: unknown) {
       this.setError(error);
     }
@@ -1149,7 +1273,7 @@ export class App implements OnInit {
     if (!this.selectedProject) return;
     const fields = [
       { key: 'titre', label: 'Intitulé de la tâche', type: 'text' as const, required: true },
-      { key: 'chargeEstimee', label: 'Charge estimée (jours)', type: 'number' as const, required: true, min: 0, step: 0.25 },
+      { key: 'heuresPrevues', label: 'Heures prévues', type: 'number' as const, required: true, min: 0.01, step: 0.01, hint: 'Par défaut : heures du projet divisées par le nombre de tâches prévues.' },
       {
         key: 'affectationId',
         label: 'Freelance affecté',
@@ -1170,6 +1294,12 @@ export class App implements OnInit {
       description: `Définissez l’intitulé, la charge et la période de la tâche pour « ${this.text(this.selectedProject, 'nom')} ».`,
       submitLabel: 'Créer la tâche',
       fields,
+      values: {
+        heuresPrevues: this.number(this.selectedProject, 'heuresPrevues') > 0
+          && this.number(this.selectedProject, 'nombreTachesPrevues') > 0
+          ? Number((this.number(this.selectedProject, 'heuresPrevues') / this.number(this.selectedProject, 'nombreTachesPrevues')).toFixed(2))
+          : '',
+      },
     });
     if (!values) return;
     const titre = String(values['titre'] ?? '').trim();
@@ -1179,7 +1309,7 @@ export class App implements OnInit {
         `/api/projets/${this.number(this.selectedProject, 'id')}/taches`,
         {
           titre,
-          chargeEstimee: Number(values['chargeEstimee']),
+          heuresPrevues: Number(values['heuresPrevues']),
           affectationId: values['affectationId'] ? Number(values['affectationId']) : null,
           dateDebut: values['dateDebut'] || null,
           dateFin: values['dateFin'] || null,
@@ -1187,6 +1317,7 @@ export class App implements OnInit {
       );
       await this.openDetails(this.selectedProject);
       this.notify('Tâche créée.');
+      this.invalidateViewCaches('projects', 'dashboard', 'my-missions');
     } catch (error: unknown) {
       this.setError(error);
     }
@@ -1231,6 +1362,7 @@ export class App implements OnInit {
         motDePasse: values['motDePasse'] || null,
       });
       this.notify('Compte modifié.');
+      this.invalidateViewCaches('users');
       await this.loadView();
     } catch (error: unknown) {
       this.setError(error);
@@ -1247,6 +1379,7 @@ export class App implements OnInit {
     if (!libelle) return;
     try {
       await this.api.post('/api/admin/types-projet', { libelle });
+      this.invalidateViewCaches('settings', 'projects');
       await this.loadView();
     } catch (error: unknown) {
       this.setError(error);
@@ -1380,20 +1513,19 @@ export class App implements OnInit {
   private async showActionDialog(
     data: ActionDialogData,
   ): Promise<ActionDialogResult | null> {
-    const result = await firstValueFrom(
-      this.dialog
-        .open<ActionDialogComponent, ActionDialogData, ActionDialogResult>(
-          ActionDialogComponent,
-          {
-            width: '640px',
-            maxWidth: 'calc(100vw - 32px)',
-            autoFocus: 'first-tabbable',
-            restoreFocus: true,
-            data,
-          },
-        )
-        .afterClosed(),
-    );
+    const ref = this.dialog.open(ActionDialogComponent, {
+      header: data.title,
+      width: '640px',
+      style: { maxWidth: 'calc(100vw - 32px)' },
+      modal: true,
+      focusOnShow: true,
+      closable: true,
+      closeOnEscape: true,
+      closeAriaLabel: 'Fermer',
+      data,
+    });
+    if (!ref) throw new Error('Impossible d’ouvrir la fenêtre de saisie.');
+    const result: ActionDialogResult | undefined = await firstValueFrom(ref.onClose);
     return result ?? null;
   }
 
@@ -1403,15 +1535,22 @@ export class App implements OnInit {
     submitLabel: string,
     danger = false,
   ): Promise<boolean> {
-    return (
-      (await this.showActionDialog({
+    if (this.pendingConfirmation) return false;
+    this.pendingConfirmation = true;
+    try {
+      const result = await this.showActionDialog({
         title,
         description,
         submitLabel,
         danger,
         fields: [],
-      })) !== null
-    );
+        confirmation: true,
+      });
+      return result?.['__confirmed'] === 'true';
+    } finally {
+      this.pendingConfirmation = false;
+      this.changeDetectorRef.markForCheck();
+    }
   }
 
   private currentWeekMonday(): string {

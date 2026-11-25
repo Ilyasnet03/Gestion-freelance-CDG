@@ -16,8 +16,12 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,6 +34,7 @@ public class ProjetService {
     private final AffectationRepository affectationRepository;
     private final TacheRepository tacheRepository;
     private final LigneTimesheetRepository ligneTimesheetRepository;
+    private final PvReceptionRepository pvReceptionRepository;
     private final EntityMapper mapper;
 
     public ProjetService(ProjetRepository projetRepository,
@@ -39,6 +44,7 @@ public class ProjetService {
                          AffectationRepository affectationRepository,
                          TacheRepository tacheRepository,
                          LigneTimesheetRepository ligneTimesheetRepository,
+                         PvReceptionRepository pvReceptionRepository,
                          EntityMapper mapper) {
         this.projetRepository = projetRepository;
         this.typeProjetRepository = typeProjetRepository;
@@ -47,6 +53,7 @@ public class ProjetService {
         this.affectationRepository = affectationRepository;
         this.tacheRepository = tacheRepository;
         this.ligneTimesheetRepository = ligneTimesheetRepository;
+        this.pvReceptionRepository = pvReceptionRepository;
         this.mapper = mapper;
     }
 
@@ -61,9 +68,10 @@ public class ProjetService {
             throw new AccessDeniedException("Seuls les administrateurs et chefs de projet peuvent consulter les projets");
         }
 
+        Map<Long, BigDecimal> budgets = calculateBudgetsConsommes();
         return projets.stream().map(p -> {
             ProjetDto dto = mapper.toProjetDto(p);
-            enrichProjetDtoWithAggregates(dto, p.getId(), p.getBudget());
+            enrichProjetDtoWithAggregates(dto, p.getId(), p.getBudget(), budgets);
             return dto;
         }).collect(Collectors.toList());
     }
@@ -114,6 +122,8 @@ public class ProjetService {
         p.setNom(req.getNom().trim());
         p.setDescription(req.getDescription());
         p.setBudget(req.getBudget());
+        p.setHeuresPrevues(req.getHeuresPrevues());
+        p.setNombreTachesPrevues(req.getNombreTachesPrevues());
         p.setDateDebut(req.getDateDebut());
         p.setDateFinPrevue(req.getDateFinPrevue());
         p.setStatut(ProjetStatut.PLANIFIE);
@@ -143,6 +153,8 @@ public class ProjetService {
         p.setNom(req.getNom().trim());
         p.setDescription(req.getDescription());
         p.setBudget(req.getBudget());
+        if (req.getHeuresPrevues() != null) p.setHeuresPrevues(req.getHeuresPrevues());
+        if (req.getNombreTachesPrevues() != null) p.setNombreTachesPrevues(req.getNombreTachesPrevues());
         p.setDateDebut(req.getDateDebut());
         p.setDateFinPrevue(req.getDateFinPrevue());
 
@@ -231,7 +243,8 @@ public class ProjetService {
         dto.setDateFinPrevue(projet.getDateFinPrevue());
 
         // Calcul du budget consommé via les lignes de timesheets validées
-        BigDecimal budgetConsomme = calculateBudgetConsomme(projetId);
+        BigDecimal budgetConsomme = calculateBudgetsConsommes()
+                .getOrDefault(projetId, BigDecimal.ZERO);
         dto.setBudgetConsomme(budgetConsomme);
 
         // Taux de consommation : (budgetConsommé / budget) * 100
@@ -247,11 +260,11 @@ public class ProjetService {
         int avancementReel = 0;
         if (!taches.isEmpty()) {
             double totalWeight = taches.stream()
-                    .mapToDouble(t -> t.getChargeEstimee() != null && t.getChargeEstimee().doubleValue() > 0 ? t.getChargeEstimee().doubleValue() : 1.0)
+                    .mapToDouble(this::taskWeight)
                     .sum();
             double progressSum = taches.stream()
                     .mapToDouble(t -> {
-                        double weight = t.getChargeEstimee() != null && t.getChargeEstimee().doubleValue() > 0 ? t.getChargeEstimee().doubleValue() : 1.0;
+                        double weight = taskWeight(t);
                         return (t.getAvancement() != null ? t.getAvancement() : 0) * weight;
                     }).sum();
             avancementReel = (int) Math.round(progressSum / totalWeight);
@@ -313,32 +326,94 @@ public class ProjetService {
     }
 
     public BigDecimal calculateBudgetConsomme(Long projetId) {
-        List<Tache> taches = tacheRepository.findAllByProjetId(projetId);
-        BigDecimal sumConsomme = BigDecimal.ZERO;
+        Map<Long, BigDecimal> budgets = calculateBudgetsConsommes();
+        return budgets.getOrDefault(projetId, BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+    }
 
+    public Map<Long, BigDecimal> calculateBudgetsConsommes() {
+        Map<Long, BigDecimal> budgets = new HashMap<>();
+        Set<Long> invoicedTimesheetIds = new HashSet<>();
+        Map<Long, List<LigneTimesheet>> linesByTimesheet = new HashMap<>();
+        List<LigneTimesheet> allLines = ligneTimesheetRepository.findAll();
+        for (LigneTimesheet line : allLines) {
+            if (line.getTimesheet() != null) {
+                linesByTimesheet.computeIfAbsent(line.getTimesheet().getId(), key -> new java.util.ArrayList<>())
+                        .add(line);
+            }
+        }
+
+        for (PvReception pv : pvReceptionRepository.findAll()) {
+            Timesheet timesheet = pv.getTimesheet();
+            if (timesheet == null || timesheet.getStatut() != TimesheetStatut.VALIDEE
+                    || pv.getMontant() == null) {
+                continue;
+            }
+
+            List<LigneTimesheet> lignesTimesheet =
+                    linesByTimesheet.getOrDefault(timesheet.getId(), List.of());
+            if (lignesTimesheet.isEmpty()) {
+                continue;
+            }
+
+            BigDecimal totalHeures = lignesTimesheet.stream()
+                    .map(LigneTimesheet::getHeures)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            Map<Long, BigDecimal> heuresByProjet = new HashMap<>();
+            for (LigneTimesheet ligne : lignesTimesheet) {
+                if (ligne.getTache() != null && ligne.getTache().getProjet() != null
+                        && ligne.getHeures() != null) {
+                    heuresByProjet.merge(ligne.getTache().getProjet().getId(),
+                            ligne.getHeures(), BigDecimal::add);
+                }
+            }
+
+            if (totalHeures.compareTo(BigDecimal.ZERO) > 0) {
+                invoicedTimesheetIds.add(timesheet.getId());
+                for (Map.Entry<Long, BigDecimal> entry : heuresByProjet.entrySet()) {
+                    BigDecimal partProjet = entry.getValue().divide(totalHeures, 6, RoundingMode.HALF_UP);
+                    BigDecimal montantProjet = pv.getMontant()
+                            .multiply(partProjet)
+                            .setScale(2, RoundingMode.HALF_UP);
+                    budgets.merge(entry.getKey(), montantProjet, BigDecimal::add);
+                }
+            }
+        }
+
+        List<Tache> taches = tacheRepository.findAll();
         for (Tache t : taches) {
             BigDecimal tjm = BigDecimal.valueOf(4500);
             if (t.getAffectation() != null && t.getAffectation().getTjmApplique() != null) {
                 tjm = t.getAffectation().getTjmApplique();
             }
-            List<LigneTimesheet> lignes = ligneTimesheetRepository.findAll().stream()
+            List<LigneTimesheet> lignes = allLines.stream()
                     .filter(l -> l.getTache() != null && Objects.equals(l.getTache().getId(), t.getId()))
-                    .filter(l -> l.getTimesheet() != null && l.getTimesheet().getStatut() == TimesheetStatut.VALIDEE)
+                    .filter(l -> l.getTimesheet() != null
+                            && l.getTimesheet().getStatut() == TimesheetStatut.VALIDEE)
+                    .filter(l -> !invoicedTimesheetIds.contains(l.getTimesheet().getId()))
                     .collect(Collectors.toList());
 
             for (LigneTimesheet l : lignes) {
-                // Heures divisées par 8 multipliées par le TJM
                 BigDecimal jours = l.getHeures().divide(BigDecimal.valueOf(8), 4, RoundingMode.HALF_UP);
-                BigDecimal coutLigne = jours.multiply(tjm);
-                sumConsomme = sumConsomme.add(coutLigne);
+                if (t.getProjet() != null) {
+                    budgets.merge(t.getProjet().getId(),
+                            jours.multiply(tjm).setScale(2, RoundingMode.HALF_UP),
+                            BigDecimal::add);
+                }
             }
         }
 
-        return sumConsomme.setScale(2, RoundingMode.HALF_UP);
+        return budgets;
     }
 
     private void enrichProjetDtoWithAggregates(ProjetDto dto, Long projetId, BigDecimal budget) {
-        BigDecimal consomme = calculateBudgetConsomme(projetId);
+        enrichProjetDtoWithAggregates(dto, projetId, budget, calculateBudgetsConsommes());
+    }
+
+    private void enrichProjetDtoWithAggregates(ProjetDto dto, Long projetId, BigDecimal budget,
+                                               Map<Long, BigDecimal> budgets) {
+        BigDecimal consomme = budgets.getOrDefault(projetId, BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
         dto.setBudgetConsomme(consomme);
         double taux = 0.0;
         if (budget != null && budget.compareTo(BigDecimal.ZERO) > 0) {
@@ -348,10 +423,23 @@ public class ProjetService {
 
         List<Tache> taches = tacheRepository.findAllByProjetId(projetId);
         if (!taches.isEmpty()) {
-            double avg = taches.stream().mapToInt(t -> t.getAvancement() != null ? t.getAvancement() : 0).average().orElse(0.0);
-            dto.setAvancementGlobal((int) Math.round(avg));
+            double totalWeight = taches.stream()
+                    .mapToDouble(this::taskWeight)
+                    .sum();
+            double progressSum = taches.stream()
+                    .mapToDouble(t -> {
+                        double weight = taskWeight(t);
+                        return (t.getAvancement() != null ? t.getAvancement() : 0) * weight;
+                    })
+                    .sum();
+            dto.setAvancementGlobal((int) Math.round(progressSum / totalWeight));
         } else {
             dto.setAvancementGlobal(0);
         }
+
+    }
+
+    private double taskWeight(Tache task) {
+        return task.getHeuresPrevues().signum() > 0 ? task.getHeuresPrevues().doubleValue() : 8.0;
     }
 }

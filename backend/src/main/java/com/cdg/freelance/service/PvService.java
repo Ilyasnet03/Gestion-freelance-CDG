@@ -6,6 +6,7 @@ import com.cdg.freelance.exception.BusinessException;
 import com.cdg.freelance.exception.ResourceNotFoundException;
 import com.cdg.freelance.mapper.EntityMapper;
 import com.cdg.freelance.repository.PaiementRepository;
+import com.cdg.freelance.repository.LigneTimesheetRepository;
 import com.cdg.freelance.repository.PvReceptionRepository;
 import com.cdg.freelance.security.UserPrincipal;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,7 +20,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -27,12 +27,27 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
+
+import com.lowagie.text.Document;
+import com.lowagie.text.Element;
+import com.lowagie.text.Font;
+import com.lowagie.text.PageSize;
+import com.lowagie.text.Paragraph;
+import com.lowagie.text.Phrase;
+import com.lowagie.text.Rectangle;
+import com.lowagie.text.pdf.PdfPCell;
+import com.lowagie.text.pdf.PdfPTable;
+import com.lowagie.text.pdf.PdfWriter;
 
 @Service
 public class PvService {
 
     private final PvReceptionRepository pvReceptionRepository;
+    private final LigneTimesheetRepository ligneTimesheetRepository;
     private final PaiementRepository paiementRepository;
     private final EntityMapper mapper;
 
@@ -40,9 +55,11 @@ public class PvService {
     private String pvStorageDir;
 
     public PvService(PvReceptionRepository pvReceptionRepository,
+                     LigneTimesheetRepository ligneTimesheetRepository,
                      PaiementRepository paiementRepository,
                      EntityMapper mapper) {
         this.pvReceptionRepository = pvReceptionRepository;
+        this.ligneTimesheetRepository = ligneTimesheetRepository;
         this.paiementRepository = paiementRepository;
         this.mapper = mapper;
     }
@@ -54,12 +71,14 @@ public class PvService {
         }
 
         // RG7 : le montant du PV vaut le total d'heures divisé par 8, multiplié par le TJM
-        BigDecimal totalHeures = BigDecimal.ZERO;
-        if (timesheet.getLignes() != null) {
-            totalHeures = timesheet.getLignes().stream()
-                    .map(LigneTimesheet::getHeures)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+        List<LigneTimesheet> lignes = ligneTimesheetRepository.findAllByTimesheetId(timesheet.getId());
+        if (lignes.isEmpty() && timesheet.getLignes() != null) {
+            lignes = timesheet.getLignes();
         }
+        BigDecimal totalHeures = lignes.stream()
+                .map(LigneTimesheet::getHeures)
+                .filter(java.util.Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal jours = totalHeures.divide(BigDecimal.valueOf(8), 4, RoundingMode.HALF_UP);
         BigDecimal montant = jours.multiply(tjmApplique).setScale(2, RoundingMode.HALF_UP);
@@ -100,18 +119,42 @@ public class PvService {
                             pv.getTimesheet().getFreelance().getUtilisateur().getId().equals(currentUser.getId()))
                     .collect(Collectors.toList());
         } else if (currentUser.getRole() == Role.CHEF_PROJET) {
+            Map<Long, List<LigneTimesheet>> linesByTimesheet = new HashMap<>();
+            List<Long> timesheetIds = pvs.stream()
+                    .map(PvReception::getTimesheet)
+                    .filter(Objects::nonNull)
+                    .map(Timesheet::getId)
+                    .collect(Collectors.toList());
+            if (!timesheetIds.isEmpty()) {
+                for (LigneTimesheet line : ligneTimesheetRepository.findAllByTimesheetIdIn(timesheetIds)) {
+                    linesByTimesheet.computeIfAbsent(line.getTimesheet().getId(), key -> new java.util.ArrayList<>())
+                            .add(line);
+                }
+            }
             pvs = pvs.stream()
-                    .filter(pv -> isManagedByChef(pv, currentUser.getId()))
+                    .filter(pv -> isManagedByChef(pv, currentUser.getId(),
+                            linesByTimesheet.getOrDefault(
+                                    pv.getTimesheet() != null ? pv.getTimesheet().getId() : -1L,
+                                    List.of())))
                     .collect(Collectors.toList());
         }
 
+        Map<Long, Paiement> paymentsByPv = new HashMap<>();
+        if (currentUser.getRole() != Role.FREELANCE) {
+            for (Paiement paiement : paiementRepository.findAll()) {
+                if (paiement.getPvReception() != null) {
+                    paymentsByPv.put(paiement.getPvReception().getId(), paiement);
+                }
+            }
+        }
         return pvs.stream().map(pv -> {
             PvDto dto = mapper.toPvDto(pv);
             if (currentUser.getRole() != Role.FREELANCE) {
-                paiementRepository.findByPvReceptionId(pv.getId()).ifPresent(p -> {
-                    dto.setPaiementId(p.getId());
-                    dto.setPaiementStatut(p.getStatut());
-                });
+                Paiement paiement = paymentsByPv.get(pv.getId());
+                if (paiement != null) {
+                    dto.setPaiementId(paiement.getId());
+                    dto.setPaiementStatut(paiement.getStatut());
+                }
             }
             return dto;
         }).collect(Collectors.toList());
@@ -202,10 +245,17 @@ public class PvService {
 
     private boolean isManagedByChef(PvReception pv, Long chefProjetId) {
         Timesheet timesheet = pv.getTimesheet();
+        List<LigneTimesheet> lignes = timesheet != null
+                ? ligneTimesheetRepository.findAllByTimesheetId(timesheet.getId())
+                : List.of();
+        return isManagedByChef(pv, chefProjetId, lignes);
+    }
+
+    private boolean isManagedByChef(PvReception pv, Long chefProjetId, List<LigneTimesheet> lignes) {
+        Timesheet timesheet = pv.getTimesheet();
         return timesheet != null
-                && timesheet.getLignes() != null
-                && !timesheet.getLignes().isEmpty()
-                && timesheet.getLignes().stream().allMatch(line -> line.getTache() != null
+                && !lignes.isEmpty()
+                && lignes.stream().allMatch(line -> line.getTache() != null
                     && line.getTache().getProjet() != null
                     && line.getTache().getProjet().getChefProjet() != null
                     && line.getTache().getProjet().getChefProjet().getId().equals(chefProjetId));
@@ -267,115 +317,179 @@ public class PvService {
                                   String freelanceNom, String freelanceEmail, String specialite,
                                   String projetNom, String cdpNom,
                                   BigDecimal totalHeures, BigDecimal tjm, BigDecimal montant) throws IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        Document document = new Document(PageSize.A4, 48, 48, 42, 42);
+        PdfWriter.getInstance(document, output);
+        document.open();
 
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        java.awt.Color navy = new java.awt.Color(18, 51, 84);
+        java.awt.Color teal = new java.awt.Color(0, 145, 154);
+        java.awt.Color lightBlue = new java.awt.Color(238, 246, 248);
+        java.awt.Color grey = new java.awt.Color(102, 112, 123);
+        java.awt.Color green = new java.awt.Color(22, 122, 91);
 
-        StringBuilder text = new StringBuilder();
-        text.append("BT\n");
-        text.append("/F1 18 Tf\n");
-        text.append("50 780 Td\n");
-        text.append("(GROUPE CAISSE DE DEPOT ET DE GESTION - CDG BEP) Tj\n");
+        Font brandFont = new Font(Font.HELVETICA, 9, Font.BOLD, navy);
+        Font titleFont = new Font(Font.HELVETICA, 20, Font.BOLD, navy);
+        Font subtitleFont = new Font(Font.HELVETICA, 10, Font.NORMAL, grey);
+        Font sectionFont = new Font(Font.HELVETICA, 11, Font.BOLD, navy);
+        Font labelFont = new Font(Font.HELVETICA, 8, Font.BOLD, grey);
+        Font valueFont = new Font(Font.HELVETICA, 10, Font.BOLD, navy);
+        Font bodyFont = new Font(Font.HELVETICA, 9, Font.NORMAL, navy);
+        Font amountFont = new Font(Font.HELVETICA, 16, Font.BOLD, green);
 
-        text.append("/F1 14 Tf\n");
-        text.append("0 -30 Td\n");
-        text.append("(PROCES-VERBAL DE RECEPTION DES PRESTATIONS) Tj\n");
+        PdfPTable header = new PdfPTable(new float[]{1f, 2.2f});
+        header.setWidthPercentage(100);
+        header.setSpacingAfter(16);
 
-        text.append("/F2 11 Tf\n");
-        text.append("0 -25 Td\n");
-        text.append("(Numero du PV : ").append(sanitizePdfText(numero)).append(") Tj\n");
-        text.append("0 -18 Td\n");
-        text.append("(Date d'emission : ").append(sanitizePdfText(dateGen)).append(") Tj\n");
-        text.append("0 -18 Td\n");
-        text.append("(Periode : du ").append(sanitizePdfText(dateDebut)).append(" au ").append(sanitizePdfText(dateFin)).append(") Tj\n");
+        PdfPCell identity = new PdfPCell();
+        identity.setBorder(Rectangle.NO_BORDER);
+        identity.addElement(new Paragraph("GROUPE CDG", brandFont));
+        identity.addElement(new Paragraph("Caisse de Dépôt et de Gestion", subtitleFont));
+        identity.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        header.addCell(identity);
 
-        text.append("0 -28 Td\n");
-        text.append("/F1 12 Tf\n");
-        text.append("(1. INFORMATIONS DU PRESTATAIRE FREELANCE) Tj\n");
-        text.append("/F2 10 Tf\n");
-        text.append("0 -18 Td\n");
-        text.append("(Nom et Prenom : ").append(sanitizePdfText(freelanceNom)).append(") Tj\n");
-        text.append("0 -16 Td\n");
-        text.append("(Email : ").append(sanitizePdfText(freelanceEmail)).append(") Tj\n");
-        text.append("0 -16 Td\n");
-        text.append("(Specialite : ").append(sanitizePdfText(specialite)).append(") Tj\n");
+        PdfPCell documentTitle = new PdfPCell();
+        documentTitle.setBorder(Rectangle.NO_BORDER);
+        documentTitle.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        Paragraph title = new Paragraph("PROCÈS-VERBAL\nDE RÉCEPTION", titleFont);
+        title.setAlignment(Element.ALIGN_RIGHT);
+        documentTitle.addElement(title);
+        header.addCell(documentTitle);
+        document.add(header);
 
-        text.append("0 -26 Td\n");
-        text.append("/F1 12 Tf\n");
-        text.append("(2. MISSION ET PROJET CDG BEP) Tj\n");
-        text.append("/F2 10 Tf\n");
-        text.append("0 -18 Td\n");
-        text.append("(Projet : ").append(sanitizePdfText(projetNom)).append(") Tj\n");
-        text.append("0 -16 Td\n");
-        text.append("(Valide par le Chef de Projet : ").append(sanitizePdfText(cdpNom)).append(") Tj\n");
+        PdfPTable meta = new PdfPTable(new float[]{1f, 1f});
+        meta.setWidthPercentage(100);
+        meta.setSpacingAfter(14);
+        addMetaCell(meta, "NUMÉRO DU PV", numero, labelFont, valueFont);
+        addMetaCell(meta, "DATE D’ÉMISSION", dateGen, labelFont, valueFont);
+        addMetaCell(meta, "PÉRIODE", "Du " + dateDebut + " au " + dateFin, labelFont, valueFont);
+        addMetaCell(meta, "PROJET", projetNom, labelFont, valueFont);
+        document.add(meta);
 
-        text.append("0 -26 Td\n");
-        text.append("/F1 12 Tf\n");
-        text.append("(3. DECOMPTE DES HEURES ET REGLEMENT) Tj\n");
-        text.append("/F2 10 Tf\n");
-        text.append("0 -18 Td\n");
-        text.append("(Volume d'heures validees : ").append(totalHeures).append(" heures) Tj\n");
-        text.append("0 -16 Td\n");
-        text.append("(Equivalent jours ouvrables (Base 8h/j) : ").append(totalHeures.divide(BigDecimal.valueOf(8), 2, RoundingMode.HALF_UP)).append(" j) Tj\n");
-        text.append("0 -16 Td\n");
-        text.append("(Tarif Journalier Moyen applique (TJM) : ").append(tjm).append(" MAD HT) Tj\n");
-        text.append("0 -20 Td\n");
-        text.append("/F1 13 Tf\n");
-        text.append("(MONTANT TOTAL A PAYER : ").append(montant).append(" MAD HT) Tj\n");
+        document.add(sectionTitle("1. PRESTATAIRE", sectionFont));
+        PdfPTable freelance = new PdfPTable(new float[]{1.15f, 1.15f, 1f});
+        freelance.setWidthPercentage(100);
+        freelance.setSpacingAfter(12);
+        addInfoCell(freelance, "Nom et prénom", freelanceNom, labelFont, bodyFont);
+        addInfoCell(freelance, "E-mail", freelanceEmail, labelFont, bodyFont);
+        addInfoCell(freelance, "Spécialité", specialite, labelFont, bodyFont);
+        document.add(freelance);
 
-        text.append("/F2 10 Tf\n");
-        text.append("0 -40 Td\n");
-        text.append("(Visa CDG BEP : Bon pour acceptation et mise en paiement comptable) Tj\n");
-        text.append("0 -20 Td\n");
-        text.append("(Signature electronique validee sur la Plateforme de Gestion des Freelances) Tj\n");
+        document.add(sectionTitle("2. VALIDATION", sectionFont));
+        PdfPTable validation = new PdfPTable(new float[]{1f, 1f});
+        validation.setWidthPercentage(100);
+        validation.setSpacingAfter(16);
+        addInfoCell(validation, "Chef de projet", cdpNom, labelFont, bodyFont);
+        addInfoCell(validation, "Décision", "VALIDÉ — Bon pour réception", labelFont, bodyFont);
+        document.add(validation);
 
-        text.append("ET\n");
+        document.add(sectionTitle("3. DÉCOMPTE", sectionFont));
+        PdfPTable amountTable = new PdfPTable(new float[]{2.2f, 1f, 1.2f, 1.4f});
+        amountTable.setWidthPercentage(100);
+        amountTable.setHeaderRows(1);
+        addTableHeader(amountTable, "Rubrique", labelFont);
+        addTableHeader(amountTable, "Quantité", labelFont);
+        addTableHeader(amountTable, "TJM HT", labelFont);
+        addTableHeader(amountTable, "Montant HT", labelFont);
 
-        String streamContent = text.toString();
-        byte[] streamBytes = streamContent.getBytes(StandardCharsets.ISO_8859_1);
+        BigDecimal jours = totalHeures.divide(BigDecimal.valueOf(8), 2, RoundingMode.HALF_UP);
+        addTableRow(amountTable, "Prestation validée", totalHeures + " h", tjm + " MAD", montant + " MAD",
+                bodyFont);
+        addTableRow(amountTable, "Équivalent ouvrable", jours + " jour(s)", "—", "—", bodyFont);
+        document.add(amountTable);
 
-        // Standard minimal PDF 1.4 output
-        StringBuilder pdf = new StringBuilder();
-        pdf.append("%PDF-1.4\n");
-        pdf.append("%\u00E2\u00E3\u00CF\u00D3\n");
+        PdfPTable total = new PdfPTable(new float[]{2f, 1f});
+        total.setWidthPercentage(100);
+        total.setSpacingBefore(10);
+        total.setSpacingAfter(18);
+        PdfPCell totalLabel = new PdfPCell(new Phrase("MONTANT TOTAL À PAYER", labelFont));
+        totalLabel.setBorder(Rectangle.BOX);
+        totalLabel.setBorderColor(teal);
+        totalLabel.setPadding(12);
+        totalLabel.setBackgroundColor(lightBlue);
+        total.addCell(totalLabel);
 
-        int offset1 = pdf.length();
-        pdf.append("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
+        PdfPCell totalValue = new PdfPCell(new Phrase(montant + " MAD HT", amountFont));
+        totalValue.setBorder(Rectangle.BOX);
+        totalValue.setBorderColor(teal);
+        totalValue.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        totalValue.setPadding(12);
+        totalValue.setBackgroundColor(lightBlue);
+        total.addCell(totalValue);
+        document.add(total);
 
-        int offset2 = pdf.length();
-        pdf.append("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n");
+        PdfPTable footer = new PdfPTable(new float[]{1f, 1f});
+        footer.setWidthPercentage(100);
+        PdfPCell visa = new PdfPCell();
+        visa.setBorder(Rectangle.NO_BORDER);
+        visa.addElement(new Paragraph("Visa du chef de projet", labelFont));
+        visa.addElement(new Paragraph(cdpNom, bodyFont));
+        footer.addCell(visa);
 
-        int offset3 = pdf.length();
-        pdf.append("3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> >>\nendobj\n");
+        PdfPCell signature = new PdfPCell();
+        signature.setBorder(Rectangle.NO_BORDER);
+        signature.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        signature.addElement(new Paragraph("Document validé électroniquement", labelFont));
+        signature.addElement(new Paragraph("Plateforme Gestion des Freelances", bodyFont));
+        footer.addCell(signature);
+        document.add(footer);
 
-        int offset4 = pdf.length();
-        pdf.append("4 0 obj\n<< /Length ").append(streamBytes.length).append(" >>\nstream\n");
-        baos.write(pdf.toString().getBytes(StandardCharsets.ISO_8859_1));
-        baos.write(streamBytes);
+        document.close();
+        return output.toByteArray();
+    }
 
-        StringBuilder pdfEnd = new StringBuilder();
-        pdfEnd.append("\nendstream\nendobj\n");
+    private Paragraph sectionTitle(String title, Font font) {
+        Paragraph paragraph = new Paragraph(title, font);
+        paragraph.setSpacingBefore(4);
+        paragraph.setSpacingAfter(7);
+        return paragraph;
+    }
 
-        int offset5 = baos.size() + pdfEnd.length() - ("\nendstream\nendobj\n".length());
-        pdfEnd.append("5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n");
+    private void addMetaCell(PdfPTable table, String label, String value,
+                             Font labelFont, Font valueFont) {
+        PdfPCell cell = new PdfPCell();
+        cell.setBorder(Rectangle.BOX);
+        cell.setBorderColor(new java.awt.Color(218, 228, 232));
+        cell.setPadding(9);
+        cell.addElement(new Paragraph(label, labelFont));
+        cell.addElement(new Paragraph(value, valueFont));
+        table.addCell(cell);
+    }
 
-        int offset6 = baos.size() + pdfEnd.length();
-        pdfEnd.append("6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n");
+    private void addInfoCell(PdfPTable table, String label, String value,
+                             Font labelFont, Font bodyFont) {
+        PdfPCell cell = new PdfPCell();
+        cell.setBorder(Rectangle.BOX);
+        cell.setBorderColor(new java.awt.Color(218, 228, 232));
+        cell.setPadding(9);
+        cell.addElement(new Paragraph(label, labelFont));
+        cell.addElement(new Paragraph(value, bodyFont));
+        table.addCell(cell);
+    }
 
-        int xrefOffset = baos.size() + pdfEnd.length();
-        pdfEnd.append("xref\n");
-        pdfEnd.append("0 7\n");
-        pdfEnd.append("0000000000 65535 f \n");
-        pdfEnd.append(String.format("%010d 00000 n \n", offset1));
-        pdfEnd.append(String.format("%010d 00000 n \n", offset2));
-        pdfEnd.append(String.format("%010d 00000 n \n", offset3));
-        pdfEnd.append(String.format("%010d 00000 n \n", offset4));
-        pdfEnd.append(String.format("%010d 00000 n \n", offset5));
-        pdfEnd.append(String.format("%010d 00000 n \n", offset6));
-        pdfEnd.append("trailer\n<< /Size 7 /Root 1 0 R >>\n");
-        pdfEnd.append("startxref\n").append(xrefOffset).append("\n%%EOF\n");
+    private void addTableHeader(PdfPTable table, String label, Font font) {
+        PdfPCell cell = new PdfPCell(new Phrase(label, font));
+        cell.setBackgroundColor(new java.awt.Color(18, 51, 84));
+        cell.setBorderColor(new java.awt.Color(18, 51, 84));
+        cell.setPadding(8);
+        cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        table.addCell(cell);
+    }
 
-        baos.write(pdfEnd.toString().getBytes(StandardCharsets.ISO_8859_1));
-        return baos.toByteArray();
+    private void addTableRow(PdfPTable table, String rubrique, String quantite,
+                             String tjm, String montant, Font font) {
+        table.addCell(tableCell(rubrique, font));
+        table.addCell(tableCell(quantite, font));
+        table.addCell(tableCell(tjm, font));
+        table.addCell(tableCell(montant, font));
+    }
+
+    private PdfPCell tableCell(String value, Font font) {
+        PdfPCell cell = new PdfPCell(new Phrase(value, font));
+        cell.setBorderColor(new java.awt.Color(218, 228, 232));
+        cell.setPadding(8);
+        cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        return cell;
     }
 
     private String sanitizePdfText(String str) {

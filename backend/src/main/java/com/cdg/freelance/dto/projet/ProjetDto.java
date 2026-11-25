@@ -11,6 +11,8 @@ public class ProjetDto {
     private String nom;
     private String description;
     private BigDecimal budget;
+    private BigDecimal heuresPrevues;
+    private Integer nombreTachesPrevues;
     private LocalDate dateDebut;
     private LocalDate dateFinPrevue;
     private ProjetStatut statut;
@@ -65,6 +67,11 @@ public class ProjetDto {
     public void setBudget(BigDecimal budget) {
         this.budget = budget;
     }
+
+    public BigDecimal getHeuresPrevues() { return heuresPrevues; }
+    public void setHeuresPrevues(BigDecimal heuresPrevues) { this.heuresPrevues = heuresPrevues; }
+    public Integer getNombreTachesPrevues() { return nombreTachesPrevues; }
+    public void setNombreTachesPrevues(Integer nombreTachesPrevues) { this.nombreTachesPrevues = nombreTachesPrevues; }
 
     public LocalDate getDateDebut() {
         return dateDebut;

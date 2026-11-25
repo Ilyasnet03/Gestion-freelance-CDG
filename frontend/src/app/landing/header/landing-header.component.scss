@@ -3,27 +3,24 @@
   position: sticky;
   top: 0;
   z-index: 100;
-}
-
-.top-strip {
-  height: 8px;
-  background: #e8e8e8;
+  height: 0;
 }
 
 .site-header {
   position: relative;
-  border-bottom: 1px solid var(--line);
-  background: var(--card);
-  transition: box-shadow 220ms ease;
+  color: #fff;
+  background: #243647;
+  transition: background-color 220ms ease, box-shadow 220ms ease;
 
   &.is-scrolled {
-    box-shadow: 0 2px 12px rgba(34, 50, 60, 0.08);
+    background: #243647;
+    box-shadow: 0 2px 12px rgba(20, 32, 44, 0.2);
   }
 }
 
 .header-inner {
-  width: min(1140px, calc(100% - 32px));
-  min-height: 116px;
+  width: min(1280px, calc(100% - 48px));
+  min-height: 88px;
   margin: 0 auto;
   display: flex;
   align-items: center;
@@ -40,18 +37,32 @@
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
+  gap: 20px;
+  color: #fff;
+  text-decoration: none;
+}
+
+.brand-logo {
+  display: block;
+  width: 70px;
+  height: 32px;
+  overflow: hidden;
+  mix-blend-mode: screen;
 
   img {
     display: block;
-    width: auto;
-    height: 84px;
-    object-fit: contain;
-    transition: height 220ms ease;
+    width: 70px;
+    height: auto;
+    filter: grayscale(1) invert(1) contrast(1.7);
   }
+}
 
-  .is-scrolled & img {
-    height: 48px;
-  }
+.brand-label {
+  padding-left: 20px;
+  border-left: 1px solid rgba(255, 255, 255, 0.38);
+  color: rgba(255, 255, 255, 0.83);
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .primary-nav {
@@ -62,7 +73,7 @@
   > a:not(.login-cta) {
     position: relative;
     padding: 10px 0;
-    color: var(--slate-dark);
+    color: rgba(255, 255, 255, 0.88);
     font-size: 14px;
     font-weight: 500;
     text-decoration: none;
@@ -73,7 +84,7 @@
       bottom: 3px;
       left: 0;
       height: 2px;
-      background: var(--green);
+      background: #9ac53c;
       content: '';
       transform: scaleX(0);
       transform-origin: left;
@@ -95,10 +106,10 @@
   select {
     min-height: 38px;
     padding: 0 10px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    color: var(--slate-dark);
-    background: var(--card);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 4px;
+    color: #fff;
+    background: #34495c;
   }
 }
 
@@ -108,16 +119,18 @@
   align-items: center;
   justify-content: center;
   padding: 0 22px;
-  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 4px;
   color: #fff;
-  background: var(--green);
+  background: transparent;
   font-size: 14px;
   font-weight: 600;
   text-decoration: none;
   transition: background-color 180ms ease;
 
   &:hover {
-    background: var(--green-dark);
+    color: #243647;
+    background: #fff;
   }
 }
 
@@ -129,15 +142,15 @@
   align-items: center;
   justify-content: center;
   gap: 5px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--card);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 4px;
+  background: transparent;
   cursor: pointer;
 
   span {
     width: 18px;
     height: 2px;
-    background: var(--slate-dark);
+    background: #fff;
   }
 }
 
@@ -154,15 +167,7 @@
 @media (max-width: 991px) {
   .header-inner {
     position: relative;
-    min-height: 90px;
-  }
-
-  .brand img {
-    height: 66px;
-  }
-
-  .is-scrolled .brand img {
-    height: 46px;
+    min-height: 72px;
   }
 
   .menu-toggle {
@@ -180,10 +185,10 @@
     flex-direction: column;
     gap: 4px;
     padding: 16px;
-    border: 1px solid var(--line);
-    border-radius: 0 0 12px 12px;
-    background: var(--card);
-    box-shadow: 0 8px 18px rgba(34, 50, 60, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 0 0 4px 4px;
+    background: #243647;
+    box-shadow: 0 8px 18px rgba(20, 32, 44, 0.2);
 
     &.is-open {
       display: flex;
@@ -213,15 +218,28 @@
 
 @media (max-width: 480px) {
   .header-inner {
-    min-height: 80px;
+    width: calc(100% - 32px);
+    min-height: 68px;
   }
 
-  .brand img {
-    height: 60px;
+  .brand {
+    gap: 12px;
+  }
+
+  .brand-label {
+    padding-left: 12px;
+    font-size: 11px;
   }
 }
 
 :host-context([dir='rtl']) {
+  .brand-label {
+    padding-right: 20px;
+    padding-left: 0;
+    border-right: 1px solid rgba(255, 255, 255, 0.38);
+    border-left: 0;
+  }
+
   .primary-nav > a:not(.login-cta)::after {
     transform-origin: right;
   }

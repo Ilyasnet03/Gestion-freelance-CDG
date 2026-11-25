@@ -25,6 +25,12 @@ public class Projet implements Serializable {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal budget;
 
+    @Column(name = "heures_prevues", precision = 10, scale = 2)
+    private BigDecimal heuresPrevues;
+
+    @Column(name = "nombre_taches_prevues")
+    private Integer nombreTachesPrevues;
+
     @Column(name = "date_debut", nullable = false)
     private LocalDate dateDebut;
 
@@ -84,6 +90,11 @@ public class Projet implements Serializable {
     public void setBudget(BigDecimal budget) {
         this.budget = budget;
     }
+
+    public BigDecimal getHeuresPrevues() { return heuresPrevues; }
+    public void setHeuresPrevues(BigDecimal heuresPrevues) { this.heuresPrevues = heuresPrevues; }
+    public Integer getNombreTachesPrevues() { return nombreTachesPrevues; }
+    public void setNombreTachesPrevues(Integer nombreTachesPrevues) { this.nombreTachesPrevues = nombreTachesPrevues; }
 
     public LocalDate getDateDebut() {
         return dateDebut;

@@ -2,6 +2,7 @@ package com.cdg.freelance;
 
 import com.cdg.freelance.dto.timesheet.AddLigneRequest;
 import com.cdg.freelance.dto.timesheet.TimesheetDto;
+import com.cdg.freelance.dto.timesheet.LigneTimesheetDto;
 import com.cdg.freelance.entity.*;
 import com.cdg.freelance.exception.BusinessException;
 import com.cdg.freelance.mapper.EntityMapper;
@@ -79,6 +80,7 @@ public class TimesheetServiceTest {
         tache.setProjet(projet);
         tache.setAffectation(affectation);
         tache.setTitre("Dev Frontend");
+        tache.setChargeEstimee(new BigDecimal("10.0"));
 
         timesheet = new Timesheet();
         timesheet.setId(500L);
@@ -105,28 +107,97 @@ public class TimesheetServiceTest {
     }
 
     @Test
-    @DisplayName("RG4: Le total d'heures d'une journée ne peut pas dépasser 24h")
-    void testAddLigne_Max24hPerDay() {
+    @DisplayName("Une soumission sans confirmation explicite est refusée")
+    void testSoumettreTimesheet_RequiresExplicitConfirmation() {
+        BusinessException exception = assertThrows(BusinessException.class, () ->
+                timesheetService.soumettreTimesheet(500L, false, userPrincipal));
+
+        assertTrue(exception.getMessage().contains("confirmation explicite"));
+        verifyNoInteractions(timesheetRepository);
+    }
+
+    @Test
+    @DisplayName("Le total journalier ne peut pas dépasser 10 h")
+    void testAddLigne_Max10hPerDay() {
         when(timesheetRepository.findById(500L)).thenReturn(Optional.of(timesheet));
-        when(freelanceRepository.findByUtilisateurId(freelanceUser.getId())).thenReturn(Optional.of(freelance));
-        when(tacheRepository.findById(300L)).thenReturn(Optional.of(tache));
+        when(freelanceRepository.findByUtilisateurIdForUpdate(freelanceUser.getId())).thenReturn(Optional.of(freelance));
+        when(tacheRepository.findForUpdateById(300L)).thenReturn(Optional.of(tache));
 
         LocalDate saisieDate = timesheet.getSemaineDebut();
         when(affectationRepository.findActiveAffectationsByFreelanceAndDate(eq(1L), eq(saisieDate)))
                 .thenReturn(List.of(affectation));
 
-        // Already 18 hours logged today
         when(ligneTimesheetRepository.sumHeuresByFreelanceAndDate(eq(1L), eq(saisieDate), any()))
-                .thenReturn(new BigDecimal("18.00"));
+                .thenReturn(new BigDecimal("2.01"));
 
-        // Freelance attempts to add 8 hours more -> total 26h > 24h
         AddLigneRequest request = new AddLigneRequest(300L, saisieDate, new BigDecimal("8.00"));
 
         BusinessException exception = assertThrows(BusinessException.class, () -> {
             timesheetService.addOrUpdateLigne(500L, request, userPrincipal);
         });
 
-        assertTrue(exception.getMessage().contains("24 h"));
+        assertTrue(exception.getMessage().contains("10 h"));
+        verify(ligneTimesheetRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Une saisie au-dessus du seuil individuel reste possible jusqu'à 10 h et avertit")
+    void testAddLigne_WarnsAboveIndividualThreshold() {
+        when(timesheetRepository.findById(500L)).thenReturn(Optional.of(timesheet));
+        when(freelanceRepository.findByUtilisateurIdForUpdate(freelanceUser.getId())).thenReturn(Optional.of(freelance));
+        when(tacheRepository.findForUpdateById(300L)).thenReturn(Optional.of(tache));
+        LocalDate day = timesheet.getSemaineDebut();
+        when(affectationRepository.findActiveAffectationsByFreelanceAndDate(1L, day)).thenReturn(List.of(affectation));
+        when(ligneTimesheetRepository.sumHeuresByFreelanceAndDate(eq(1L), eq(day), any())).thenReturn(new BigDecimal("2"));
+        when(ligneTimesheetRepository.sumHeuresByTache(300L, null)).thenReturn(BigDecimal.ZERO);
+        when(ligneTimesheetRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(mapper.toLigneTimesheetDto(any())).thenAnswer(invocation -> new LigneTimesheetDto());
+
+        LigneTimesheetDto result = timesheetService.addOrUpdateLigne(500L,
+                new AddLigneRequest(300L, day, new BigDecimal("8")), userPrincipal);
+        assertTrue(result.getAvertissement().contains("10 h"));
+        assertTrue(result.getAvertissement().contains("8 h"));
+    }
+
+    @Test
+    @DisplayName("Une modification remplace la ligne existante et respecte le seuil configuré")
+    void testAddLigne_ExcludesExistingLineAndUsesConfiguredThreshold() {
+        freelance.setSeuilHeuresJour(new BigDecimal("9"));
+        LocalDate day = timesheet.getSemaineDebut();
+        LigneTimesheet existing = new LigneTimesheet(timesheet, tache, day, new BigDecimal("5"));
+        existing.setId(7L);
+        when(timesheetRepository.findById(500L)).thenReturn(Optional.of(timesheet));
+        when(freelanceRepository.findByUtilisateurIdForUpdate(freelanceUser.getId())).thenReturn(Optional.of(freelance));
+        when(tacheRepository.findForUpdateById(300L)).thenReturn(Optional.of(tache));
+        when(affectationRepository.findActiveAffectationsByFreelanceAndDate(1L, day)).thenReturn(List.of(affectation));
+        when(ligneTimesheetRepository.findByTimesheetIdAndTacheIdAndDateSaisie(500L, 300L, day)).thenReturn(Optional.of(existing));
+        when(ligneTimesheetRepository.sumHeuresByFreelanceAndDate(1L, day, 7L)).thenReturn(new BigDecimal("1"));
+        when(ligneTimesheetRepository.sumHeuresByTache(300L, 7L)).thenReturn(new BigDecimal("72"));
+        when(ligneTimesheetRepository.save(existing)).thenReturn(existing);
+        when(mapper.toLigneTimesheetDto(existing)).thenReturn(new LigneTimesheetDto());
+
+        LigneTimesheetDto result = timesheetService.addOrUpdateLigne(500L,
+                new AddLigneRequest(300L, day, new BigDecimal("8")), userPrincipal);
+        assertNull(result.getAvertissement());
+        assertEquals(new BigDecimal("8"), existing.getHeures());
+    }
+
+    @Test
+    @DisplayName("Les saisies dépassant le plafond de la tâche sont refusées")
+    void testAddLigne_RejectsTaskOverrun() {
+        LocalDate day = timesheet.getSemaineDebut();
+        tache.setHeuresPrevues(new BigDecimal("10.00"));
+        when(timesheetRepository.findById(500L)).thenReturn(Optional.of(timesheet));
+        when(freelanceRepository.findByUtilisateurIdForUpdate(freelanceUser.getId())).thenReturn(Optional.of(freelance));
+        when(tacheRepository.findForUpdateById(300L)).thenReturn(Optional.of(tache));
+        when(affectationRepository.findActiveAffectationsByFreelanceAndDate(1L, day)).thenReturn(List.of(affectation));
+        when(ligneTimesheetRepository.sumHeuresByFreelanceAndDate(1L, day, null)).thenReturn(BigDecimal.ZERO);
+        when(ligneTimesheetRepository.sumHeuresByTache(300L, null)).thenReturn(new BigDecimal("8.50"));
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> timesheetService.addOrUpdateLigne(
+                500L, new AddLigneRequest(300L, day, new BigDecimal("1.51")), userPrincipal));
+        assertTrue(exception.getMessage().contains("heures prévues"));
+        verify(ligneTimesheetRepository, never()).save(any());
     }
 
     @Test
@@ -134,7 +205,7 @@ public class TimesheetServiceTest {
     void testAddLigne_CannotModifyValidatedTimesheet() {
         timesheet.setStatut(TimesheetStatut.VALIDEE);
         when(timesheetRepository.findById(500L)).thenReturn(Optional.of(timesheet));
-        when(freelanceRepository.findByUtilisateurId(freelanceUser.getId())).thenReturn(Optional.of(freelance));
+        when(freelanceRepository.findByUtilisateurIdForUpdate(freelanceUser.getId())).thenReturn(Optional.of(freelance));
 
         AddLigneRequest request = new AddLigneRequest(300L, timesheet.getSemaineDebut(), new BigDecimal("4.00"));
 
@@ -143,6 +214,99 @@ public class TimesheetServiceTest {
         });
 
         assertTrue(exception.getMessage().contains("verrouillée"));
+    }
+
+    @Test
+    @DisplayName("La validation d'une timesheet met à jour l'avancement de la tâche")
+    void testValiderTimesheet_UpdatesTaskProgress() {
+        Utilisateur chef = new Utilisateur("Chef", "CDG", "chef@cdg.ma", "hash", Role.CHEF_PROJET, true);
+        chef.setId(20L);
+        projet.setChefProjet(chef);
+        tache.setChargeEstimee(new BigDecimal("10.0"));
+
+        LigneTimesheet ligne = new LigneTimesheet(timesheet, tache,
+                timesheet.getSemaineDebut(), new BigDecimal("40.00"));
+        ligne.setId(400L);
+        timesheet.setStatut(TimesheetStatut.SOUMISE);
+
+        UserPrincipal chefPrincipal = new UserPrincipal(chef);
+
+        when(timesheetRepository.findById(500L)).thenReturn(Optional.of(timesheet));
+        when(ligneTimesheetRepository.findAllByTimesheetId(500L)).thenReturn(List.of(ligne));
+        when(ligneTimesheetRepository.findAllByTacheId(300L)).thenReturn(List.of(ligne));
+        when(utilisateurRepository.findById(20L)).thenReturn(Optional.of(chef));
+        when(timesheetRepository.save(timesheet)).thenReturn(timesheet);
+        when(tacheRepository.save(tache)).thenReturn(tache);
+        when(mapper.toTimesheetDto(timesheet)).thenReturn(new TimesheetDto());
+        when(pvReceptionRepository.findByTimesheetId(500L)).thenReturn(Optional.empty());
+
+        timesheetService.validerTimesheet(500L, chefPrincipal);
+
+        assertEquals(50, tache.getAvancement());
+        assertEquals(TacheStatut.EN_COURS, tache.getStatut());
+        verify(tacheRepository).save(tache);
+    }
+
+    @Test
+    @DisplayName("Une validation ne fait jamais diminuer un avancement déjà supérieur")
+    void testValiderTimesheet_DoesNotDecreaseTaskProgress() {
+        Utilisateur chef = new Utilisateur("Chef", "CDG", "chef@cdg.ma", "hash", Role.CHEF_PROJET, true);
+        chef.setId(20L);
+        projet.setChefProjet(chef);
+        tache.setChargeEstimee(new BigDecimal("10.0"));
+        tache.setAvancement(75);
+
+        LigneTimesheet ligne = new LigneTimesheet(timesheet, tache,
+                timesheet.getSemaineDebut(), new BigDecimal("40.00"));
+        ligne.setId(400L);
+        timesheet.setStatut(TimesheetStatut.SOUMISE);
+
+        UserPrincipal chefPrincipal = new UserPrincipal(chef);
+
+        when(timesheetRepository.findById(500L)).thenReturn(Optional.of(timesheet));
+        when(ligneTimesheetRepository.findAllByTimesheetId(500L)).thenReturn(List.of(ligne));
+        when(ligneTimesheetRepository.findAllByTacheId(300L)).thenReturn(List.of(ligne));
+        when(utilisateurRepository.findById(20L)).thenReturn(Optional.of(chef));
+        when(timesheetRepository.save(timesheet)).thenReturn(timesheet);
+        when(tacheRepository.save(tache)).thenReturn(tache);
+        when(mapper.toTimesheetDto(timesheet)).thenReturn(new TimesheetDto());
+        when(pvReceptionRepository.findByTimesheetId(500L)).thenReturn(Optional.empty());
+
+        timesheetService.validerTimesheet(500L, chefPrincipal);
+
+        assertEquals(75, tache.getAvancement());
+        assertEquals(TacheStatut.EN_COURS, tache.getStatut());
+    }
+
+    @Test
+    @DisplayName("Le filtrage par statut ne retourne que les timesheets correspondant à l'état demandé")
+    void testListTimesheets_FiltersByStatus() {
+        Timesheet soumise = new Timesheet();
+        soumise.setId(501L);
+        soumise.setFreelance(freelance);
+        soumise.setSemaineDebut(timesheet.getSemaineDebut().plusWeeks(1));
+        soumise.setStatut(TimesheetStatut.SOUMISE);
+
+        when(freelanceRepository.findByUtilisateurId(freelanceUser.getId()))
+                .thenReturn(Optional.of(freelance));
+        when(timesheetRepository.findAllByFreelanceId(freelance.getId()))
+                .thenReturn(List.of(timesheet, soumise));
+        when(ligneTimesheetRepository.findAllByTimesheetIdIn(anyList()))
+                .thenReturn(List.of());
+        when(pvReceptionRepository.findAllByTimesheetIdIn(anyList()))
+                .thenReturn(List.of());
+        when(mapper.toTimesheetDto(any(Timesheet.class)))
+                .thenAnswer(invocation -> {
+                    TimesheetDto dto = new TimesheetDto();
+                    dto.setId(invocation.<Timesheet>getArgument(0).getId());
+                    return dto;
+                });
+
+        List<TimesheetDto> result =
+                timesheetService.listTimesheets(null, TimesheetStatut.SOUMISE, userPrincipal);
+
+        assertEquals(1, result.size());
+        assertEquals(501L, result.get(0).getId());
     }
 
     @Test
@@ -172,7 +336,7 @@ public class TimesheetServiceTest {
         ligneAutreChef.setTache(autreTache);
 
         when(timesheetRepository.findAll()).thenReturn(List.of(timesheet));
-        when(ligneTimesheetRepository.findAllByTimesheetId(timesheet.getId()))
+        when(ligneTimesheetRepository.findAllByTimesheetIdIn(List.of(timesheet.getId())))
                 .thenReturn(List.of(ligneChef, ligneAutreChef));
 
         List<TimesheetDto> result = timesheetService.listTimesheets(null, new UserPrincipal(chef));

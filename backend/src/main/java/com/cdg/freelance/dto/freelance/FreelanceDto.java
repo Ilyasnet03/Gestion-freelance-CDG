@@ -12,6 +12,7 @@ public class FreelanceDto {
     private BigDecimal tjm;
     private String specialite;
     private String statut;
+    private BigDecimal seuilHeuresJour;
 
     public FreelanceDto() {}
 
@@ -82,4 +83,7 @@ public class FreelanceDto {
     public String getNomComplet() {
         return (prenom != null ? prenom : "") + " " + (nom != null ? nom : "");
     }
+
+    public BigDecimal getSeuilHeuresJour() { return seuilHeuresJour; }
+    public void setSeuilHeuresJour(BigDecimal seuilHeuresJour) { this.seuilHeuresJour = seuilHeuresJour; }
 }

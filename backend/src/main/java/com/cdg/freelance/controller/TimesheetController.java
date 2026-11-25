@@ -1,6 +1,7 @@
 package com.cdg.freelance.controller;
 
 import com.cdg.freelance.dto.timesheet.*;
+import com.cdg.freelance.entity.TimesheetStatut;
 import com.cdg.freelance.security.UserPrincipal;
 import com.cdg.freelance.service.TimesheetService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,11 +29,12 @@ public class TimesheetController {
     }
 
     @GetMapping
-    @Operation(summary = "Lister les timesheets selon le rôle et le filtre semaine (semaine=YYYY-MM-DD)")
+    @Operation(summary = "Lister les timesheets selon le rôle et les filtres semaine et statut")
     public ResponseEntity<List<TimesheetDto>> listTimesheets(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate semaine,
+            @RequestParam(required = false) TimesheetStatut statut,
             @AuthenticationPrincipal UserPrincipal principal) {
-        return ResponseEntity.ok(timesheetService.listTimesheets(semaine, principal));
+        return ResponseEntity.ok(timesheetService.listTimesheets(semaine, statut, principal));
     }
 
     @GetMapping("/{id}")
@@ -54,7 +56,7 @@ public class TimesheetController {
 
     @PostMapping("/{id}/lignes")
     @PreAuthorize("hasRole('FREELANCE')")
-    @Operation(summary = "Ajouter ou modifier une ligne de saisie d'heures (contrôle 24 h journalier)")
+    @Operation(summary = "Ajouter ou modifier une ligne d'heures (avertissement au seuil individuel, maximum 10 h par jour)")
     public ResponseEntity<LigneTimesheetDto> addOrUpdateLigne(
             @PathVariable Long id,
             @Valid @RequestBody AddLigneRequest req,
@@ -78,8 +80,9 @@ public class TimesheetController {
     @Operation(summary = "Soumettre la feuille de temps (BROUILLON/REJETEE -> SOUMISE)")
     public ResponseEntity<TimesheetDto> soumettre(
             @PathVariable Long id,
+            @RequestParam(name = "confirmed", defaultValue = "false") boolean confirmed,
             @AuthenticationPrincipal UserPrincipal principal) {
-        return ResponseEntity.ok(timesheetService.soumettreTimesheet(id, principal));
+        return ResponseEntity.ok(timesheetService.soumettreTimesheet(id, confirmed, principal));
     }
 
     @PostMapping("/{id}/valider")

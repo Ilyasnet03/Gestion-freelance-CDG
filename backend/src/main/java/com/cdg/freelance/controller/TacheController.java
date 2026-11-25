@@ -43,8 +43,9 @@ public class TacheController {
     @GetMapping("/mes-missions")
     @PreAuthorize("hasRole('FREELANCE')")
     @Operation(summary = "Lister les tâches affectées au freelance connecté")
-    public ResponseEntity<List<TacheDto>> listMesMissions(@AuthenticationPrincipal UserPrincipal principal) {
-        return ResponseEntity.ok(tacheService.listMesMissions(principal));
+    public ResponseEntity<List<TacheDto>> listMesMissions(@RequestParam(defaultValue = "false") boolean disponibles,
+                                                           @AuthenticationPrincipal UserPrincipal principal) {
+        return ResponseEntity.ok(tacheService.listMesMissions(principal, disponibles));
     }
 
     @PostMapping("/projets/{id}/taches")

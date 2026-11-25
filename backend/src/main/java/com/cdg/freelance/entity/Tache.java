@@ -27,6 +27,9 @@ public class Tache implements Serializable {
     @Column(name = "charge_estimee", nullable = false, precision = 6, scale = 1)
     private BigDecimal chargeEstimee = BigDecimal.ZERO;
 
+    @Column(name = "heures_prevues", precision = 10, scale = 2)
+    private BigDecimal heuresPrevues;
+
     @Column(nullable = false)
     private Integer avancement = 0;
 
@@ -80,6 +83,14 @@ public class Tache implements Serializable {
 
     public void setChargeEstimee(BigDecimal chargeEstimee) {
         this.chargeEstimee = chargeEstimee;
+    }
+
+    public BigDecimal getHeuresPrevues() {
+        return heuresPrevues != null ? heuresPrevues : chargeEstimee.multiply(BigDecimal.valueOf(8));
+    }
+
+    public void setHeuresPrevues(BigDecimal heuresPrevues) {
+        this.heuresPrevues = heuresPrevues;
     }
 
     public Integer getAvancement() {

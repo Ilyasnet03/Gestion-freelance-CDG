@@ -2,6 +2,7 @@ package com.cdg.freelance;
 
 import com.cdg.freelance.dto.freelance.CreateFreelanceRequest;
 import com.cdg.freelance.dto.freelance.FreelanceDto;
+import com.cdg.freelance.dto.freelance.UpdateFreelanceRequest;
 import com.cdg.freelance.entity.Freelance;
 import com.cdg.freelance.entity.Role;
 import com.cdg.freelance.entity.Utilisateur;
@@ -11,6 +12,7 @@ import com.cdg.freelance.repository.FreelanceRepository;
 import com.cdg.freelance.repository.UtilisateurRepository;
 import com.cdg.freelance.security.UserPrincipal;
 import com.cdg.freelance.service.FreelanceService;
+import org.springframework.security.access.AccessDeniedException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +25,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class FreelanceServiceTest {
@@ -83,5 +86,26 @@ class FreelanceServiceTest {
         BusinessException exception = assertThrows(BusinessException.class, () -> freelanceService.createFreelance(request));
 
         assertTrue(exception.getMessage().contains("déjà"));
+    }
+
+    @Test
+    void onlyAdminCanChangeDailyThreshold() {
+        Utilisateur user = new Utilisateur("Tazi", "Mehdi", "mehdi@cdg.ma", "hash", Role.FREELANCE, true);
+        Freelance freelance = new Freelance(user, new BigDecimal("550"), "Java", "ACTIF");
+        UpdateFreelanceRequest request = new UpdateFreelanceRequest();
+        request.setTjm(new BigDecimal("550"));
+        request.setSeuilHeuresJour(new BigDecimal("7.5"));
+        when(freelanceRepository.findById(33L)).thenReturn(Optional.of(freelance));
+
+        Utilisateur chef = new Utilisateur("Chef", "CDG", "chef@cdg.ma", "hash", Role.CHEF_PROJET, true);
+        assertThrows(AccessDeniedException.class, () ->
+                freelanceService.updateFreelance(33L, request, new UserPrincipal(chef)));
+        assertEquals(new BigDecimal("8.00"), freelance.getSeuilHeuresJour());
+
+        Utilisateur admin = new Utilisateur("Admin", "CDG", "admin@cdg.ma", "hash", Role.ADMIN, true);
+        when(freelanceRepository.save(freelance)).thenReturn(freelance);
+        freelanceService.updateFreelance(33L, request, new UserPrincipal(admin));
+        assertEquals(new BigDecimal("7.5"), freelance.getSeuilHeuresJour());
+        verify(freelanceRepository).save(freelance);
     }
 }

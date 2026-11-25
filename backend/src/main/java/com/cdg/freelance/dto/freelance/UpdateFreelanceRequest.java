@@ -1,6 +1,8 @@
 package com.cdg.freelance.dto.freelance;
 
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
@@ -12,6 +14,11 @@ public class UpdateFreelanceRequest {
 
     private String specialite;
     private String statut;
+
+    @DecimalMin(value = "0.01", message = "Le seuil doit être supérieur à 0")
+    @DecimalMax(value = "10.00", message = "Le seuil ne peut dépasser 10 h")
+    @Digits(integer = 2, fraction = 2, message = "Le seuil doit avoir au maximum deux décimales")
+    private BigDecimal seuilHeuresJour;
 
     public UpdateFreelanceRequest() {}
 
@@ -38,4 +45,7 @@ public class UpdateFreelanceRequest {
     public void setStatut(String statut) {
         this.statut = statut;
     }
+
+    public BigDecimal getSeuilHeuresJour() { return seuilHeuresJour; }
+    public void setSeuilHeuresJour(BigDecimal seuilHeuresJour) { this.seuilHeuresJour = seuilHeuresJour; }
 }

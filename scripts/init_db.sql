@@ -34,7 +34,8 @@ CREATE TABLE freelance (
     utilisateur_id BIGINT NOT NULL UNIQUE REFERENCES utilisateur(id) ON DELETE CASCADE,
     tjm NUMERIC(10,2) NOT NULL CHECK (tjm > 0),
     specialite VARCHAR(100),
-    statut VARCHAR(30) NOT NULL DEFAULT 'ACTIF'
+    statut VARCHAR(30) NOT NULL DEFAULT 'ACTIF',
+    seuil_heures_jour NUMERIC(4,2) DEFAULT 8.00 CHECK (seuil_heures_jour > 0 AND seuil_heures_jour <= 10)
 );
 
 -- 3. Table Type de Projet
@@ -50,6 +51,8 @@ CREATE TABLE projet (
     nom VARCHAR(150) NOT NULL,
     description TEXT,
     budget NUMERIC(12,2) NOT NULL CHECK (budget > 0),
+    heures_prevues NUMERIC(10,2) CHECK (heures_prevues > 0),
+    nombre_taches_prevues INTEGER CHECK (nombre_taches_prevues > 0),
     date_debut DATE NOT NULL,
     date_fin_prevue DATE NOT NULL,
     statut VARCHAR(30) NOT NULL DEFAULT 'PLANIFIE' CHECK (statut IN ('PLANIFIE', 'EN_COURS', 'SUSPENDU', 'TERMINE')),
@@ -75,6 +78,7 @@ CREATE TABLE tache (
     affectation_id BIGINT REFERENCES affectation(id) ON DELETE SET NULL,
     titre VARCHAR(200) NOT NULL,
     charge_estimee NUMERIC(6,1) NOT NULL DEFAULT 0 CHECK (charge_estimee >= 0),
+    heures_prevues NUMERIC(10,2) CHECK (heures_prevues > 0),
     avancement INT NOT NULL DEFAULT 0 CHECK (avancement BETWEEN 0 AND 100),
     statut VARCHAR(30) NOT NULL DEFAULT 'A_FAIRE' CHECK (statut IN ('A_FAIRE', 'EN_COURS', 'TERMINEE')),
     date_debut DATE,

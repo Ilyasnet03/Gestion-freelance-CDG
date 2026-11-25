@@ -7,15 +7,11 @@ import {
   ValidatorFn,
   Validators,
 } from '@angular/forms';
-import {
-  MAT_DIALOG_DATA,
-  MatDialogModule,
-  MatDialogRef,
-} from '@angular/material/dialog';
-import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
+import { ButtonModule } from 'primeng/button';
+import { DynamicDialogConfig, DynamicDialogRef } from 'primeng/dynamicdialog';
+import { InputTextModule } from 'primeng/inputtext';
+import { SelectModule } from 'primeng/select';
+import { TextareaModule } from 'primeng/textarea';
 
 export type DialogFieldValue = string | number | null;
 export type DialogFieldType =
@@ -53,6 +49,7 @@ export interface ActionDialogData {
   values?: Record<string, DialogFieldValue | undefined>;
   submitLabel?: string;
   danger?: boolean;
+  confirmation?: boolean;
 }
 
 export type ActionDialogResult = Record<string, DialogFieldValue>;
@@ -63,19 +60,17 @@ export type ActionDialogResult = Record<string, DialogFieldValue>;
   imports: [
     CommonModule,
     ReactiveFormsModule,
-    MatButtonModule,
-    MatDialogModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatSelectModule,
+    ButtonModule,
+    InputTextModule,
+    SelectModule,
+    TextareaModule,
   ],
   templateUrl: './action-dialog.component.html',
   styleUrl: './action-dialog.component.scss',
 })
 export class ActionDialogComponent {
-  readonly data = inject<ActionDialogData>(MAT_DIALOG_DATA);
-  private readonly dialogRef =
-    inject<MatDialogRef<ActionDialogComponent, ActionDialogResult>>(MatDialogRef);
+  readonly data: ActionDialogData = inject(DynamicDialogConfig).data;
+  private readonly dialogRef = inject(DynamicDialogRef);
   readonly form = new FormRecord<FormControl<DialogFieldValue>>({});
 
   constructor() {
@@ -124,11 +119,19 @@ export class ActionDialogComponent {
     return 'Vérifiez cette valeur.';
   }
 
+  cancel(): void {
+    this.dialogRef.close();
+  }
+
   submit(): void {
     if (this.hasVisibleErrors()) {
       for (const field of this.data.fields) {
         if (this.isVisible(field)) this.control(field).markAsTouched();
       }
+      return;
+    }
+    if (this.data.confirmation) {
+      this.dialogRef.close({ __confirmed: 'true' });
       return;
     }
     this.dialogRef.close(this.form.getRawValue());

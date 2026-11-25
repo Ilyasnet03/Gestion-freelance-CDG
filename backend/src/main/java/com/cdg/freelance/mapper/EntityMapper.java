@@ -39,6 +39,7 @@ public class EntityMapper {
         FreelanceDto dto = new FreelanceDto();
         dto.setId(f.getId());
         dto.setTjm(f.getTjm());
+        dto.setSeuilHeuresJour(f.getSeuilHeuresJour());
         dto.setSpecialite(f.getSpecialite());
         dto.setStatut(f.getStatut());
         if (f.getUtilisateur() != null) {
@@ -68,6 +69,8 @@ public class EntityMapper {
         dto.setNom(p.getNom());
         dto.setDescription(p.getDescription());
         dto.setBudget(p.getBudget());
+        dto.setHeuresPrevues(p.getHeuresPrevues());
+        dto.setNombreTachesPrevues(p.getNombreTachesPrevues());
         dto.setDateDebut(p.getDateDebut());
         dto.setDateFinPrevue(p.getDateFinPrevue());
         dto.setStatut(p.getStatut());
@@ -109,6 +112,7 @@ public class EntityMapper {
         dto.setId(t.getId());
         dto.setTitre(t.getTitre());
         dto.setChargeEstimee(t.getChargeEstimee());
+        dto.setHeuresPrevues(t.getHeuresPrevues());
         dto.setAvancement(t.getAvancement());
         dto.setStatut(t.getStatut());
         dto.setDateDebut(t.getDateDebut());

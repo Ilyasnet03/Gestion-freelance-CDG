@@ -14,6 +14,8 @@ public class TacheDto {
     private String freelanceNomComplet;
     private String titre;
     private BigDecimal chargeEstimee;
+    private BigDecimal heuresPrevues;
+    private BigDecimal heuresSaisies;
     private Integer avancement;
     private TacheStatut statut;
     private LocalDate dateDebut;
@@ -84,6 +86,11 @@ public class TacheDto {
     public void setChargeEstimee(BigDecimal chargeEstimee) {
         this.chargeEstimee = chargeEstimee;
     }
+
+    public BigDecimal getHeuresPrevues() { return heuresPrevues; }
+    public void setHeuresPrevues(BigDecimal heuresPrevues) { this.heuresPrevues = heuresPrevues; }
+    public BigDecimal getHeuresSaisies() { return heuresSaisies; }
+    public void setHeuresSaisies(BigDecimal heuresSaisies) { this.heuresSaisies = heuresSaisies; }
 
     public Integer getAvancement() {
         return avancement;

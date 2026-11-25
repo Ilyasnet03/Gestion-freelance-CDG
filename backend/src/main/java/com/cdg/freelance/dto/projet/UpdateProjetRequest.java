@@ -4,6 +4,8 @@ import com.cdg.freelance.entity.ProjetStatut;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Digits;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -17,6 +19,12 @@ public class UpdateProjetRequest {
     @NotNull(message = "Le budget est obligatoire")
     @DecimalMin(value = "1.00", message = "Le budget doit être supérieur à 0")
     private BigDecimal budget;
+
+    @DecimalMin(value = "0.01", message = "Les heures prévues doivent être positives")
+    @Digits(integer = 8, fraction = 2)
+    private BigDecimal heuresPrevues;
+    @Min(value = 1, message = "Le nombre de tâches prévues doit être positif")
+    private Integer nombreTachesPrevues;
 
     @NotNull(message = "La date de début est obligatoire")
     private LocalDate dateDebut;
@@ -53,6 +61,11 @@ public class UpdateProjetRequest {
     public void setBudget(BigDecimal budget) {
         this.budget = budget;
     }
+
+    public BigDecimal getHeuresPrevues() { return heuresPrevues; }
+    public void setHeuresPrevues(BigDecimal heuresPrevues) { this.heuresPrevues = heuresPrevues; }
+    public Integer getNombreTachesPrevues() { return nombreTachesPrevues; }
+    public void setNombreTachesPrevues(Integer nombreTachesPrevues) { this.nombreTachesPrevues = nombreTachesPrevues; }
 
     public LocalDate getDateDebut() {
         return dateDebut;

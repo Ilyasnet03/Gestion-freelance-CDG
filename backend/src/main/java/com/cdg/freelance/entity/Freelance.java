@@ -25,6 +25,9 @@ public class Freelance implements Serializable {
     @Column(nullable = false, length = 30)
     private String statut = "ACTIF";
 
+    @Column(precision = 4, scale = 2)
+    private BigDecimal seuilHeuresJour = new BigDecimal("8.00");
+
     public Freelance() {}
 
     public Freelance(Utilisateur utilisateur, BigDecimal tjm, String specialite, String statut) {
@@ -72,5 +75,13 @@ public class Freelance implements Serializable {
 
     public void setStatut(String statut) {
         this.statut = statut;
+    }
+
+    public BigDecimal getSeuilHeuresJour() {
+        return seuilHeuresJour == null ? new BigDecimal("8.00") : seuilHeuresJour;
+    }
+
+    public void setSeuilHeuresJour(BigDecimal seuilHeuresJour) {
+        this.seuilHeuresJour = seuilHeuresJour;
     }
 }
