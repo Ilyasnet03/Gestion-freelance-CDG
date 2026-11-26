@@ -2,9 +2,9 @@ package com.cdg.freelance.service;
 
 import com.cdg.freelance.exception.BusinessException;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
+import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 import java.util.Map;
@@ -18,7 +18,11 @@ public class FastApiClientService {
     @Value("${application.security.internal-api-key:cdg-internal-secret-api-key-2026}")
     private String internalApiKey;
 
-    private RestClient restClient = RestClient.create();
+    private final RestClient restClient;
+
+    public FastApiClientService(RestClient.Builder restClientBuilder) {
+        this.restClient = restClientBuilder.build();
+    }
 
     public Map<String, Object> executeAnalyses() {
         String url = fastApiUrl + "/analyses/run";

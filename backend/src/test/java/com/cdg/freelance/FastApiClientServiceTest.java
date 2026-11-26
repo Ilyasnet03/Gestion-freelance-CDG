@@ -18,12 +18,11 @@ class FastApiClientServiceTest {
 
     @Test
     void parsesJsonResponseFromFastApi() {
-        FastApiClientService service = new FastApiClientService();
-        ReflectionTestUtils.setField(service, "fastApiUrl", "http://localhost:8000");
-        ReflectionTestUtils.setField(service, "internalApiKey", "test-key");
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        ReflectionTestUtils.setField(service, "restClient", builder.build());
+        FastApiClientService service = new FastApiClientService(builder);
+        ReflectionTestUtils.setField(service, "fastApiUrl", "http://localhost:8000");
+        ReflectionTestUtils.setField(service, "internalApiKey", "test-key");
         server.expect(requestTo("http://localhost:8000/analyses/run"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("X-Internal-API-Key", "test-key"))
