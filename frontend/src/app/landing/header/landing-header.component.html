@@ -22,13 +22,36 @@
       aria-label="Navigation principale"
       [class.is-open]="mobileMenuOpen()"
     >
-      <a href="#accueil" [class.active]="activeSection() === 'accueil'" [attr.aria-current]="activeSection() === 'accueil' ? 'location' : null" (click)="closeMobileMenu()">Accueil</a>
-      <a href="#fonctionnalites" [class.active]="activeSection() === 'fonctionnalites'" [attr.aria-current]="activeSection() === 'fonctionnalites' ? 'location' : null" (click)="closeMobileMenu()">Fonctionnalités</a>
-      <a href="#processus" [class.active]="activeSection() === 'processus'" [attr.aria-current]="activeSection() === 'processus' ? 'location' : null" (click)="closeMobileMenu()">Processus</a>
+      <a
+        href="#accueil"
+        [class.active]="activeSection() === 'accueil'"
+        [attr.aria-current]="activeSection() === 'accueil' ? 'location' : null"
+        (click)="closeMobileMenu()"
+        >Accueil</a
+      >
+      <a
+        href="#fonctionnalites"
+        [class.active]="activeSection() === 'fonctionnalites'"
+        [attr.aria-current]="activeSection() === 'fonctionnalites' ? 'location' : null"
+        (click)="closeMobileMenu()"
+        >Fonctionnalités</a
+      >
+      <a
+        href="#processus"
+        [class.active]="activeSection() === 'processus'"
+        [attr.aria-current]="activeSection() === 'processus' ? 'location' : null"
+        (click)="closeMobileMenu()"
+        >Processus</a
+      >
 
       <div class="header-actions">
         <label class="visually-hidden" for="landing-language">Sélection de la langue</label>
-        <select id="landing-language" aria-label="Sélection de la langue" [value]="language" (change)="changeLanguage($event)">
+        <select
+          id="landing-language"
+          aria-label="Sélection de la langue"
+          [value]="language"
+          (change)="changeLanguage($event)"
+        >
           <option value="FR">FR</option>
           <option value="EN">EN</option>
           <option value="AR">AR</option>

@@ -14,7 +14,12 @@ describe('App', () => {
 
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter(routes), DialogService],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter(routes),
+        DialogService,
+      ],
     }).compileComponents();
   });
 
@@ -67,18 +72,16 @@ describe('App', () => {
     const http = TestBed.inject(HttpTestingController);
     const opening = app.openDetails({ id: 42, nom: 'Projet de test' });
     await new Promise((resolve) => setTimeout(resolve, 0));
-    http.expectOne('/api/projets/42/taches').flush([
-      { id: 7, titre: 'Tâche visible', statut: 'EN_COURS', avancement: 25 },
-    ]);
+    http
+      .expectOne('/api/projets/42/taches')
+      .flush([{ id: 7, titre: 'Tâche visible', statut: 'EN_COURS', avancement: 25 }]);
     await new Promise((resolve) => setTimeout(resolve, 0));
     http.expectOne('/api/projets/42/affectations').flush([]);
     await opening;
     fixture.detectChanges();
 
     expect(app.detailDialogVisible).toBe(true);
-    expect(document.querySelector('.p-dialog')?.textContent).toContain(
-      'Tâche visible',
-    );
+    expect(document.querySelector('.p-dialog')?.textContent).toContain('Tâche visible');
     app.detailDialogVisible = false;
     http.verify();
   });
@@ -145,9 +148,7 @@ describe('App', () => {
     fixture.detectChanges();
 
     expect(app.detailDialogVisible).toBe(true);
-    expect(document.querySelector('.p-dialog')?.textContent).toContain(
-      'Saisie visible',
-    );
+    expect(document.querySelector('.p-dialog')?.textContent).toContain('Saisie visible');
     app.detailDialogVisible = false;
     http.verify();
   });
@@ -167,9 +168,9 @@ describe('App', () => {
 
     const firstLoad = app.loadView();
     await new Promise((resolve) => setTimeout(resolve, 0));
-    http.expectOne('/api/projets').flush([
-      { id: 42, nom: 'Projet en cache', avancementGlobal: 25 },
-    ]);
+    http
+      .expectOne('/api/projets')
+      .flush([{ id: 42, nom: 'Projet en cache', avancementGlobal: 25 }]);
     await firstLoad;
 
     const freelancersLoad = app.selectView('freelancers');
@@ -181,9 +182,9 @@ describe('App', () => {
     expect(app.rows[0]['nom']).toBe('Projet en cache');
     expect(app.loading).toBe(false);
     await new Promise((resolve) => setTimeout(resolve, 0));
-    http.expectOne('/api/projets').flush([
-      { id: 42, nom: 'Projet actualisé', avancementGlobal: 50 },
-    ]);
+    http
+      .expectOne('/api/projets')
+      .flush([{ id: 42, nom: 'Projet actualisé', avancementGlobal: 50 }]);
     await cachedLoad;
 
     expect(app.rows[0]['nom']).toBe('Projet actualisé');
@@ -260,9 +261,9 @@ describe('App', () => {
 
     app.setTimesheetStatusFilter('SOUMISE');
     await new Promise((resolve) => setTimeout(resolve, 0));
-    http.expectOne('/api/timesheets?statut=SOUMISE').flush([
-      { id: 10, statut: 'SOUMISE', semaineDebut: '2026-03-02' },
-    ]);
+    http
+      .expectOne('/api/timesheets?statut=SOUMISE')
+      .flush([{ id: 10, statut: 'SOUMISE', semaineDebut: '2026-03-02' }]);
     await new Promise((resolve) => setTimeout(resolve, 0));
     http.expectOne('/api/paiements').flush([]);
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -315,16 +316,26 @@ describe('App', () => {
     const adding = app.addHours();
     await new Promise((resolve) => setTimeout(resolve, 0));
     const dialog = TestBed.inject(DialogService);
-    [...dialog.dialogComponentRefMap.keys()][0].close({ tacheId: 7, dateSaisie: '2026-03-02', heures: 9 });
+    [...dialog.dialogComponentRefMap.keys()][0].close({
+      tacheId: 7,
+      dateSaisie: '2026-03-02',
+      heures: 9,
+    });
     await new Promise((resolve) => setTimeout(resolve, 0));
-    http.expectOne('/api/timesheets/9/lignes').flush({ avertissement: '9 h dépasse votre seuil de 8 h' });
+    http
+      .expectOne('/api/timesheets/9/lignes')
+      .flush({ avertissement: '9 h dépasse votre seuil de 8 h' });
     await new Promise((resolve) => setTimeout(resolve, 0));
-    http.expectOne('/api/timesheets/9').flush({ id: 9, statut: 'BROUILLON', semaineDebut: '2026-03-02', lignes: [] });
+    http
+      .expectOne('/api/timesheets/9')
+      .flush({ id: 9, statut: 'BROUILLON', semaineDebut: '2026-03-02', lignes: [] });
     await new Promise((resolve) => setTimeout(resolve, 0));
     http.expectOne('/api/mes-missions?disponibles=true').flush([]);
     await adding;
     fixture.detectChanges();
-    expect(document.querySelector('.p-dialog [role="alert"]')?.textContent).toContain('9 h dépasse');
+    expect(document.querySelector('.p-dialog [role="alert"]')?.textContent).toContain(
+      '9 h dépasse',
+    );
     app.detailDialogVisible = false;
     http.verify();
   });
@@ -344,13 +355,11 @@ describe('App', () => {
 
     const loading = app.loadView();
     await new Promise((resolve) => setTimeout(resolve, 0));
-    http.expectOne('/api/timesheets').flush([
-      { id: 10, statut: 'VALIDEE', semaineDebut: '2026-03-02' },
-    ]);
+    http
+      .expectOne('/api/timesheets')
+      .flush([{ id: 10, statut: 'VALIDEE', semaineDebut: '2026-03-02' }]);
     await new Promise((resolve) => setTimeout(resolve, 0));
-    http.expectOne('/api/paiements').flush([
-      { id: 20, timesheetId: 10, statut: 'EN_ATTENTE' },
-    ]);
+    http.expectOne('/api/paiements').flush([{ id: 20, timesheetId: 10, statut: 'EN_ATTENTE' }]);
     await loading;
 
     expect(app.rows[0]['paiementId']).toBe(20);
@@ -393,9 +402,7 @@ describe('App', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 0));
     http.expectOne('/api/dashboard/kpi').flush({ projetsActifsCount: 1 });
-    http.expectOne('/api/projets').flush([
-      { id: 1, nom: 'Projet de démonstration' },
-    ]);
+    http.expectOne('/api/projets').flush([{ id: 1, nom: 'Projet de démonstration' }]);
     await loadViewSpy.mock.results[0].value;
     await fixture.whenStable();
 

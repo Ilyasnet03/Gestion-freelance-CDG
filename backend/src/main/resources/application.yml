@@ -1,8 +1,8 @@
 server:
   port: ${SPRING_BOOT_PORT:8080}
   error:
-    include-message: always
-    include-binding-errors: always
+    include-message: never
+    include-binding-errors: never
 
 spring:
   application:
@@ -25,9 +25,9 @@ spring:
 application:
   security:
     jwt:
-      secret-key: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      secret-key: ${JWT_SECRET}
       expiration: ${JWT_EXPIRATION_MS:86400000} # 24 heures en millisecondes
-    internal-api-key: ${INTERNAL_API_KEY:cdg-internal-secret-api-key-2026}
+    internal-api-key: ${INTERNAL_API_KEY}
   storage:
     pv-dir: ./uploads/pv
   analytics:

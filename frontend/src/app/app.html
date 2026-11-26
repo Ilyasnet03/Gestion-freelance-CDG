@@ -1,18 +1,42 @@
 @if (!isDashboardRoute || !user) {
-  <app-landing-page (authenticated)="onLandingAuthenticated()" />
+  @defer (on immediate) {
+    <app-landing-page (authenticated)="onLandingAuthenticated()" />
+  } @placeholder {
+    <div class="landing-loading" aria-label="Chargement"></div>
+  }
 } @else {
   <a class="skip-link" href="#main-content">Aller au contenu principal</a>
-  <div class="app-shell" [class.menu-open]="menuOpen" [attr.dir]="language === 'AR' ? 'rtl' : 'ltr'">
-    <button class="sidebar-backdrop" type="button" aria-label="Fermer le menu" (click)="menuOpen = false"></button>
+  <div
+    class="app-shell"
+    [class.menu-open]="menuOpen"
+    [attr.dir]="language === 'AR' ? 'rtl' : 'ltr'"
+  >
+    <button
+      class="sidebar-backdrop"
+      type="button"
+      aria-label="Fermer le menu"
+      (click)="menuOpen = false"
+    ></button>
     <aside class="sidebar" id="app-menu" aria-label="Menu principal">
       <div class="side-brand">
-        <img class="side-brand-logo" src="assets/logo-cdg.png" alt="CDG — Caisse de Dépôt et de Gestion">
-        <span>Gestion<br>des freelances</span>
+        <img
+          class="side-brand-logo"
+          src="assets/logo-cdg.png"
+          alt="CDG — Caisse de Dépôt et de Gestion"
+        />
+        <span>Gestion<br />des freelances</span>
       </div>
       <p class="nav-label">Espace de travail</p>
       <nav>
         @for (item of visibleMenu; track item.id) {
-          <button pButton [text]="true" class="nav-button" [class.active]="currentView === item.id" (click)="selectView(item.id)" [attr.aria-current]="currentView === item.id ? 'page' : null">
+          <button
+            pButton
+            [text]="true"
+            class="nav-button"
+            [class.active]="currentView === item.id"
+            (click)="selectView(item.id)"
+            [attr.aria-current]="currentView === item.id ? 'page' : null"
+          >
             <span class="nav-icon" aria-hidden="true">{{ navIcon(item.id) }}</span>
             {{ item.title }}
           </button>
@@ -21,26 +45,52 @@
       <div class="sidebar-bottom">
         <strong>{{ user.prenom }} {{ user.nom }}</strong>
         <span>{{ roleLabel(user.role) }}</span>
-        <button pButton [text]="true" class="nav-button logout-button" (click)="logout()">Déconnexion</button>
+        <button pButton [text]="true" class="nav-button logout-button" (click)="logout()">
+          Déconnexion
+        </button>
       </div>
     </aside>
 
     <div class="main">
       <header class="topbar">
-        <button pButton [text]="true" class="menu-toggle" type="button" (click)="menuOpen = !menuOpen" [attr.aria-expanded]="menuOpen" aria-controls="app-menu" aria-label="Ouvrir ou fermer le menu">☰</button>
+        <button
+          pButton
+          [text]="true"
+          class="menu-toggle"
+          type="button"
+          (click)="menuOpen = !menuOpen"
+          [attr.aria-expanded]="menuOpen"
+          aria-controls="app-menu"
+          aria-label="Ouvrir ou fermer le menu"
+        >
+          ☰
+        </button>
         <h1>{{ title }}</h1>
         <div class="topbar-user">
-          <select aria-label="Langue" [ngModel]="language" (ngModelChange)="setLanguage($event)" name="app-language">
-            <option value="FR">FR</option><option value="EN">EN</option><option value="AR">AR</option>
+          <select
+            aria-label="Langue"
+            [ngModel]="language"
+            (ngModelChange)="setLanguage($event)"
+            name="app-language"
+          >
+            <option value="FR">FR</option>
+            <option value="EN">EN</option>
+            <option value="AR">AR</option>
           </select>
           <span>{{ user.prenom || user.email }}</span>
-          <span class="avatar" aria-hidden="true">{{ user.prenom.charAt(0) }}{{ user.nom.charAt(0) }}</span>
+          <span class="avatar" aria-hidden="true"
+            >{{ user.prenom.charAt(0) }}{{ user.nom.charAt(0) }}</span
+          >
         </div>
       </header>
 
       <main class="content" id="main-content" tabindex="-1">
         @if (loading) {
-          <p-progressbar class="view-loading" mode="indeterminate" aria-label="Chargement de la page" />
+          <p-progressbar
+            class="view-loading"
+            mode="indeterminate"
+            aria-label="Chargement de la page"
+          />
         }
         @if (error) {
           <div class="error-panel" role="alert">{{ error }}</div>
@@ -57,34 +107,89 @@
             <button pButton [outlined]="true" (click)="loadView()">Actualiser</button>
           </section>
           <section class="kpi-grid">
-            <div class="kpi-card"><span>Projets actifs</span><strong>{{ stat('projetsActifsCount') }}</strong></div>
-            <div class="kpi-card"><span>Budget global</span><strong>{{ money(dashboard['budgetGlobalTotal']) }}</strong></div>
-            <div class="kpi-card"><span>Budget consommé</span><strong>{{ money(dashboard['budgetConsommeTotal']) }}</strong></div>
-            <div class="kpi-card"><span>Timesheets à valider</span><strong>{{ stat('timesheetsAValiderCount') }}</strong></div>
+            <div class="kpi-card">
+              <span>Projets actifs</span><strong>{{ stat('projetsActifsCount') }}</strong>
+            </div>
+            <div class="kpi-card">
+              <span>Budget global</span><strong>{{ money(dashboard['budgetGlobalTotal']) }}</strong>
+            </div>
+            <div class="kpi-card">
+              <span>Budget consommé</span
+              ><strong>{{ money(dashboard['budgetConsommeTotal']) }}</strong>
+            </div>
+            <div class="kpi-card">
+              <span>Timesheets à valider</span
+              ><strong>{{ stat('timesheetsAValiderCount') }}</strong>
+            </div>
           </section>
           @if (user.role === 'ADMIN') {
-            <app-admin-dashboard [dashboard]="dashboard" [refreshVersion]="dashboardRefreshVersion" (navigate)="selectView($event)" />
+            @defer (on immediate) {
+              <app-admin-dashboard
+                [dashboard]="dashboard"
+                [refreshVersion]="dashboardRefreshVersion"
+                (navigate)="selectView($event)"
+              />
+            }
           }
           <section class="dashboard-grid">
             <section class="panel-card">
-              <div class="panel-heading"><div><h2>Projets</h2><p>Avancement et consommation budgétaire</p></div><button pButton [outlined]="true" (click)="selectView('projects')">Tout voir</button></div>
+              <div class="panel-heading">
+                <div>
+                  <h2>Projets</h2>
+                  <p>Avancement et consommation budgétaire</p>
+                </div>
+                <button pButton [outlined]="true" (click)="selectView('projects')">
+                  Tout voir
+                </button>
+              </div>
               <div class="table-wrap">
                 <p-table [value]="rows" styleClass="data-table">
-                  <ng-template #header><tr><th>Projet</th><th>Statut</th><th>Avancement</th><th>Budget consommé</th></tr></ng-template>
-                  <ng-template #body let-row><tr>
-                    <td><strong>{{ text(row, 'nom') }}</strong><small>{{ text(row, 'code') }}</small></td>
-                    <td><span class="status-badge">{{ cell(row, 'statut') }}</span></td>
-                    <td><p-progressbar [value]="number(row, 'avancementGlobal')" [showValue]="false" />{{ cell(row, 'avancementGlobal') }}</td>
-                    <td>{{ money(row['budgetConsomme']) }} / {{ money(row['budget']) }}</td>
-                  </tr></ng-template>
+                  <ng-template #header
+                    ><tr>
+                      <th>Projet</th>
+                      <th>Statut</th>
+                      <th>Avancement</th>
+                      <th>Budget consommé</th>
+                    </tr></ng-template
+                  >
+                  <ng-template #body let-row
+                    ><tr>
+                      <td>
+                        <strong>{{ text(row, 'nom') }}</strong><small>{{
+                          text(row, 'code')
+                        }}</small>
+                      </td>
+                      <td>
+                        <span class="status-badge">{{ cell(row, 'statut') }}</span>
+                      </td>
+                      <td>
+                        <p-progressbar
+                          [value]="number(row, 'avancementGlobal')"
+                          [showValue]="false"
+                        />{{ cell(row, 'avancementGlobal') }}
+                      </td>
+                      <td>{{ money(row['budgetConsomme']) }} / {{ money(row['budget']) }}</td>
+                    </tr></ng-template
+                  >
                 </p-table>
               </div>
             </section>
             <section class="panel-card">
-              <div class="panel-heading"><div><h2>Alertes récentes</h2><p>{{ stat('alertesCritiquesCount') }} critique(s) · {{ stat('alertesAttentionCount') }} à surveiller</p></div></div>
+              <div class="panel-heading">
+                <div>
+                  <h2>Alertes récentes</h2>
+                  <p>
+                    {{ stat('alertesCritiquesCount') }} critique(s) ·
+                    {{ stat('alertesAttentionCount') }} à surveiller
+                  </p>
+                </div>
+              </div>
               @for (alert of alerts(); track $index) {
                 <article class="alert-item">
-                  <strong>{{ text(alert, 'projetNom') || 'Projet' }} · {{ cell(alert, 'niveau') }}</strong>
+                  <strong
+                    >{{ text(alert, 'projetNom') || 'Projet' }} ·
+                    {{ cell(alert, 'niveau') }}</strong
+                  >
                   <p>{{ text(alert, 'message') }}</p>
                   <small>{{ cell(alert, 'dateCreation') }}</small>
                 </article>
@@ -95,7 +200,10 @@
           </section>
         } @else if (currentView !== 'dashboard') {
           <section class="toolbar">
-            <div><h2>{{ sectionTitle }}</h2><p class="secondary-text">{{ sectionHint }}</p></div>
+            <div>
+              <h2>{{ sectionTitle }}</h2>
+              <p class="secondary-text">{{ sectionHint }}</p>
+            </div>
             <div class="toolbar-actions">
               @if (currentView === 'timesheets') {
                 <select
@@ -116,8 +224,12 @@
                 <button pButton (click)="startCreate()">Ajouter</button>
               }
               @if (currentView === 'analysis') {
-                <button pButton [outlined]="true" (click)="runAnalysis()">Exécuter l’analyse</button>
-                <button pButton [outlined]="true" (click)="downloadMonthlyReport()">Rapport mensuel</button>
+                <button pButton [outlined]="true" (click)="runAnalysis()">
+                  Exécuter l’analyse
+                </button>
+                <button pButton [outlined]="true" (click)="downloadMonthlyReport()">
+                  Rapport mensuel
+                </button>
               }
               <button pButton [outlined]="true" (click)="loadView()">Actualiser</button>
             </div>
@@ -125,77 +237,175 @@
 
           @if (currentView === 'billing' || currentView === 'settings') {
             <section class="panel-card secondary-list">
-              <h2>{{ currentView === 'billing' ? 'Procès-verbaux de réception' : 'Types de projet' }}</h2>
+              <h2>
+                {{ currentView === 'billing' ? 'Procès-verbaux de réception' : 'Types de projet' }}
+              </h2>
               <div class="table-wrap">
                 <p-table [value]="secondaryRows" styleClass="data-table compact-table">
-                  <ng-template #header><tr>
-                    @for (column of secondaryColumns; track column.key) { <th>{{ column.label }}</th> }
-                    @if (currentView === 'billing') { <th>Actions</th> }
-                  </tr></ng-template>
-                  <ng-template #body let-row><tr>
-                    @for (column of secondaryColumns; track column.key) { <td>{{ cell(row, column.key) }}</td> }
-                    @if (currentView === 'billing') {
-                      <td><button pButton [text]="true" (click)="downloadPv(row)" aria-label="Télécharger le PDF du procès-verbal"><i class="pi pi-download" aria-hidden="true"></i> PDF</button></td>
-                    }
-                  </tr></ng-template>
+                  <ng-template #header
+                    ><tr>
+                      @for (column of secondaryColumns; track column.key) {
+                        <th>{{ column.label }}</th>
+                      }
+                      @if (currentView === 'billing') {
+                        <th>Actions</th>
+                      }
+                    </tr></ng-template
+                  >
+                  <ng-template #body let-row
+                    ><tr>
+                      @for (column of secondaryColumns; track column.key) {
+                        <td>{{ cell(row, column.key) }}</td>
+                      }
+                      @if (currentView === 'billing') {
+                        <td>
+                          <button
+                            pButton
+                            [text]="true"
+                            (click)="downloadPv(row)"
+                            aria-label="Télécharger le PDF du procès-verbal"
+                          >
+                            <i class="pi pi-download" aria-hidden="true"></i> PDF
+                          </button>
+                        </td>
+                      }
+                    </tr></ng-template
+                  >
                 </p-table>
-                @if (!secondaryRows.length) { <p class="empty-state">Aucune donnée à afficher.</p> }
+                @if (!secondaryRows.length) {
+                  <p class="empty-state">Aucune donnée à afficher.</p>
+                }
               </div>
-              @if (currentView === 'settings') { <button pButton [outlined]="true" (click)="createType()">Ajouter un type de projet</button> }
+              @if (currentView === 'settings') {
+                <button pButton [outlined]="true" (click)="createType()">
+                  Ajouter un type de projet
+                </button>
+              }
             </section>
           }
 
           <section class="panel-card">
             <div class="table-wrap">
               <p-table [value]="rows" styleClass="data-table">
-                <ng-template #header><tr>
-                  @for (column of columns; track column.key) { <th>{{ column.label }}</th> }
-                  <th>Actions</th>
-                </tr></ng-template>
-                <ng-template #body let-row><tr>
-                  @for (column of columns; track column.key) {
+                <ng-template #header
+                  ><tr>
+                    @for (column of columns; track column.key) {
+                      <th>{{ column.label }}</th>
+                    }
+                    <th>Actions</th>
+                  </tr></ng-template
+                >
+                <ng-template #body let-row
+                  ><tr>
+                    @for (column of columns; track column.key) {
+                      <td>
+                        @if (
+                          column.key === 'statut' ||
+                          column.key === 'niveau' ||
+                          column.key === 'traitee'
+                        ) {
+                          <span class="status-badge" [ngClass]="statusClass(row, column.key)">{{
+                            cell(row, column.key)
+                          }}</span>
+                        } @else {
+                          {{ cell(row, column.key) }}
+                        }
+                      </td>
+                    }
                     <td>
-                      @if (column.key === 'statut' || column.key === 'niveau' || column.key === 'traitee') {
-                        <span class="status-badge" [ngClass]="statusClass(row, column.key)">{{ cell(row, column.key) }}</span>
-                      } @else {
-                        {{ cell(row, column.key) }}
-                      }
+                      <button
+                        pButton
+                        [text]="true"
+                        (click)="rowActions.toggle($event)"
+                        [attr.aria-label]="
+                          'Actions — ' +
+                          (text(row, 'nomComplet') ||
+                            text(row, 'nom') ||
+                            text(row, 'titre') ||
+                            'élément')
+                        "
+                      >
+                        <i class="pi pi-ellipsis-v" aria-hidden="true"></i>
+                      </button>
+                      <p-popover #rowActions>
+                        <div class="action-menu">
+                          @if (
+                            actionLabel(row) &&
+                            !(currentView === 'billing' && text(row, 'statut') === 'PAYE') &&
+                            !(currentView === 'analysis' && bool(row, 'traitee'))
+                          ) {
+                            <button
+                              pButton
+                              [text]="true"
+                              (click)="rowActions.hide(); rowAction(row)"
+                            >
+                              {{ actionLabel(row) }}
+                            </button>
+                          }
+                          @if (
+                            currentView === 'timesheets' &&
+                            user.role === 'FREELANCE' &&
+                            ['BROUILLON', 'REJETEE'].includes(text(row, 'statut'))
+                          ) {
+                            <button
+                              pButton
+                              [text]="true"
+                              (click)="rowActions.hide(); submitSheet(row)"
+                            >
+                              Soumettre à validation
+                            </button>
+                          }
+                          @if (
+                            currentView === 'timesheets' &&
+                            user.role === 'CHEF_PROJET' &&
+                            text(row, 'statut') === 'SOUMISE'
+                          ) {
+                            <button
+                              pButton
+                              [text]="true"
+                              (click)="rowActions.hide(); rejectSheet(row)"
+                            >
+                              Rejeter la feuille
+                            </button>
+                          }
+                          @if (canConfirmPayment(row)) {
+                            <button
+                              pButton
+                              [text]="true"
+                              (click)="rowActions.hide(); confirmTimesheetPayment(row)"
+                            >
+                              Confirmer le paiement
+                            </button>
+                          }
+                          @if (currentView === 'users') {
+                            <button
+                              pButton
+                              [text]="true"
+                              (click)="rowActions.hide(); editUser(row)"
+                            >
+                              Modifier le compte
+                            </button>
+                          }
+                        </div>
+                      </p-popover>
                     </td>
-                  }
-                  <td>
-                    <button
-                      pButton [text]="true"
-                      (click)="rowActions.toggle($event)"
-                      [attr.aria-label]="'Actions — ' + (text(row, 'nomComplet') || text(row, 'nom') || text(row, 'titre') || 'élément')"
-                    ><i class="pi pi-ellipsis-v" aria-hidden="true"></i></button>
-                    <p-popover #rowActions>
-                      <div class="action-menu">
-                      @if (actionLabel(row) && !(currentView === 'billing' && text(row, 'statut') === 'PAYE') && !(currentView === 'analysis' && bool(row, 'traitee'))) {
-                        <button pButton [text]="true" (click)="rowActions.hide(); rowAction(row)">{{ actionLabel(row) }}</button>
-                      }
-                      @if (currentView === 'timesheets' && user.role === 'FREELANCE' && ['BROUILLON', 'REJETEE'].includes(text(row, 'statut'))) {
-                        <button pButton [text]="true" (click)="rowActions.hide(); submitSheet(row)">Soumettre à validation</button>
-                      }
-                      @if (currentView === 'timesheets' && user.role === 'CHEF_PROJET' && text(row, 'statut') === 'SOUMISE') {
-                        <button pButton [text]="true" (click)="rowActions.hide(); rejectSheet(row)">Rejeter la feuille</button>
-                      }
-                      @if (canConfirmPayment(row)) {
-                        <button pButton [text]="true" (click)="rowActions.hide(); confirmTimesheetPayment(row)">Confirmer le paiement</button>
-                      }
-                      @if (currentView === 'users') {
-                        <button pButton [text]="true" (click)="rowActions.hide(); editUser(row)">Modifier le compte</button>
-                      }
-                      </div>
-                    </p-popover>
-                  </td>
-                </tr></ng-template>
+                  </tr></ng-template
+                >
               </p-table>
-              <p class="empty-state" [hidden]="rows.length > 0 || loading">Aucune donnée à afficher.</p>
+              <p class="empty-state" [hidden]="rows.length > 0 || loading">
+                Aucune donnée à afficher.
+              </p>
             </div>
           </section>
 
-          <p-dialog [(visible)]="detailDialogVisible" [header]="detailTitle" [modal]="true" closeAriaLabel="Fermer les détails"
-            [style]="{ width: '900px', maxWidth: 'calc(100vw - 32px)' }" [contentStyle]="{ maxHeight: '70vh' }">
+          <p-dialog
+            [(visible)]="detailDialogVisible"
+            [header]="detailTitle"
+            [modal]="true"
+            closeAriaLabel="Fermer les détails"
+            [style]="{ width: '900px', maxWidth: 'calc(100vw - 32px)' }"
+            [contentStyle]="{ maxHeight: '70vh' }"
+          >
             @if (currentView === 'timesheets' && error) {
               <div class="error-panel" role="alert">{{ error }}</div>
             }
@@ -205,12 +415,26 @@
             <div class="detail-dialog-header">
               <div class="toolbar-actions">
                 @if (currentView === 'projects' && user.role === 'CHEF_PROJET') {
-                  <button pButton [outlined]="true" (click)="projectActions.toggle($event)">Actions du projet</button>
-                  <p-popover #projectActions><div class="action-menu">
-                    <button pButton [text]="true" (click)="projectActions.hide(); editProject()">Modifier le projet</button>
-                    <button pButton [text]="true" (click)="projectActions.hide(); createTask()">Créer une tâche</button>
-                    <button pButton [text]="true" (click)="projectActions.hide(); assignFreelancer()">Affecter un freelance</button>
-                  </div></p-popover>
+                  <button pButton [outlined]="true" (click)="projectActions.toggle($event)">
+                    Actions du projet
+                  </button>
+                  <p-popover #projectActions
+                    ><div class="action-menu">
+                      <button pButton [text]="true" (click)="projectActions.hide(); editProject()">
+                        Modifier le projet
+                      </button>
+                      <button pButton [text]="true" (click)="projectActions.hide(); createTask()">
+                        Créer une tâche
+                      </button>
+                      <button
+                        pButton
+                        [text]="true"
+                        (click)="projectActions.hide(); assignFreelancer()"
+                      >
+                        Affecter un freelance
+                      </button>
+                    </div></p-popover
+                  >
                 }
                 @if (currentView === 'timesheets' && canEditSelectedSheet) {
                   <button pButton (click)="addHours()">Ajouter des heures</button>
@@ -220,26 +444,69 @@
             <div class="detail-dialog-content">
               <div class="table-wrap detail-table-wrap">
                 <p-table [value]="detailRows" styleClass="data-table">
-                  <ng-template #header><tr>
-                    @for (column of detailColumns; track column.key) { <th>{{ column.label }}</th> }
-                    @if ((currentView === 'projects' && user.role === 'CHEF_PROJET') || canEditSelectedSheet) { <th>Actions</th> }
-                  </tr></ng-template>
-                  <ng-template #body let-row><tr>
-                    @for (column of detailColumns; track column.key) { <td>{{ cell(row, column.key) }}</td> }
-                    @if ((currentView === 'projects' && user.role === 'CHEF_PROJET') || canEditSelectedSheet) {
-                      <td>
-                        <button pButton [text]="true" (click)="detailActions.toggle($event)" aria-label="Actions sur le détail"><i class="pi pi-ellipsis-v" aria-hidden="true"></i></button>
-                        <p-popover #detailActions><div class="action-menu">
-                          @if (currentView === 'projects') {
-                            <button pButton [text]="true" (click)="detailActions.hide(); editTask(row)">Modifier la tâche</button>
-                            <button pButton [text]="true" (click)="detailActions.hide(); detailAction(row)">Mettre à jour l’avancement</button>
-                          } @else if (canEditSelectedSheet) {
-                            <button pButton [text]="true" (click)="detailActions.hide(); detailAction(row)">Supprimer la ligne d’heures</button>
-                          }
-                        </div></p-popover>
-                      </td>
-                    }
-                  </tr></ng-template>
+                  <ng-template #header
+                    ><tr>
+                      @for (column of detailColumns; track column.key) {
+                        <th>{{ column.label }}</th>
+                      }
+                      @if (
+                        (currentView === 'projects' && user.role === 'CHEF_PROJET') ||
+                        canEditSelectedSheet
+                      ) {
+                        <th>Actions</th>
+                      }
+                    </tr></ng-template
+                  >
+                  <ng-template #body let-row
+                    ><tr>
+                      @for (column of detailColumns; track column.key) {
+                        <td>{{ cell(row, column.key) }}</td>
+                      }
+                      @if (
+                        (currentView === 'projects' && user.role === 'CHEF_PROJET') ||
+                        canEditSelectedSheet
+                      ) {
+                        <td>
+                          <button
+                            pButton
+                            [text]="true"
+                            (click)="detailActions.toggle($event)"
+                            aria-label="Actions sur le détail"
+                          >
+                            <i class="pi pi-ellipsis-v" aria-hidden="true"></i>
+                          </button>
+                          <p-popover #detailActions
+                            ><div class="action-menu">
+                              @if (currentView === 'projects') {
+                                <button
+                                  pButton
+                                  [text]="true"
+                                  (click)="detailActions.hide(); editTask(row)"
+                                >
+                                  Modifier la tâche
+                                </button>
+                                <button
+                                  pButton
+                                  [text]="true"
+                                  (click)="detailActions.hide(); detailAction(row)"
+                                >
+                                  Mettre à jour l’avancement
+                                </button>
+                              } @else if (canEditSelectedSheet) {
+                                <button
+                                  pButton
+                                  [text]="true"
+                                  (click)="detailActions.hide(); detailAction(row)"
+                                >
+                                  Supprimer la ligne d’heures
+                                </button>
+                              }
+                            </div></p-popover
+                          >
+                        </td>
+                      }
+                    </tr></ng-template
+                  >
                 </p-table>
               </div>
             </div>
@@ -247,7 +514,10 @@
         }
       </main>
       <footer class="app-footer">
-        <div class="app-footer-inner"><strong>CDG · Gestion des freelances</strong><span>Plateforme interne de gestion des projets, temps et facturation.</span></div>
+        <div class="app-footer-inner">
+          <strong>CDG · Gestion des freelances</strong
+          ><span>Plateforme interne de gestion des projets, temps et facturation.</span>
+        </div>
       </footer>
     </div>
   </div>

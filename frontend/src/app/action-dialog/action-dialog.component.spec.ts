@@ -1,9 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { DynamicDialogConfig, DynamicDialogRef } from 'primeng/dynamicdialog';
-import {
-  ActionDialogComponent,
-  ActionDialogData,
-} from './action-dialog.component';
+import { ActionDialogComponent, ActionDialogData } from './action-dialog.component';
 
 describe('ActionDialogComponent', () => {
   const data: ActionDialogData = {
@@ -14,7 +11,10 @@ describe('ActionDialogComponent', () => {
         label: 'Rôle',
         type: 'select',
         required: true,
-        options: [{ value: 'FREELANCE', label: 'Freelance' }, { value: 'ADMIN', label: 'Administrateur' }],
+        options: [
+          { value: 'FREELANCE', label: 'Freelance' },
+          { value: 'ADMIN', label: 'Administrateur' },
+        ],
       },
       {
         key: 'tjm',
@@ -73,8 +73,9 @@ describe('ActionDialogComponent', () => {
 
     const select = fixture.nativeElement.querySelector('[role="combobox"]') as HTMLElement;
     expect(select.getAttribute('aria-label')).toBe('Rôle');
-    const cancel = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')]
-      .find((button) => button.textContent?.trim() === 'Annuler');
+    const cancel = [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')].find(
+      (button) => button.textContent?.trim() === 'Annuler',
+    );
     expect(cancel).toBeDefined();
     cancel?.click();
     expect(close).toHaveBeenCalledWith();

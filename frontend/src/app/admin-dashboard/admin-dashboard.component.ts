@@ -1,5 +1,14 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectorRef, Component, EventEmitter, Input, OnChanges, OnDestroy, Output, inject } from '@angular/core';
+import {
+  ChangeDetectorRef,
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  OnDestroy,
+  Output,
+  inject,
+} from '@angular/core';
 import { ButtonModule } from 'primeng/button';
 import { ApiRow, ApiService } from '../api.service';
 
@@ -52,7 +61,8 @@ export class AdminDashboardComponent implements OnChanges, OnDestroy {
     } catch (error: unknown) {
       if (version === this.requestVersion) {
         this.weeks = [];
-        this.hoursError = error instanceof Error ? error.message : 'Impossible de charger les heures validées.';
+        this.hoursError =
+          error instanceof Error ? error.message : 'Impossible de charger les heures validées.';
       }
     } finally {
       if (version === this.requestVersion) {
@@ -79,8 +89,10 @@ export class AdminDashboardComponent implements OnChanges, OnDestroy {
   }
 
   get comparableCount(): number {
-    return this.progress.filter((item) =>
-      this.numeric(item['avancementReel']) !== null && this.numeric(item['avancementAttendu']) !== null,
+    return this.progress.filter(
+      (item) =>
+        this.numeric(item['avancementReel']) !== null &&
+        this.numeric(item['avancementAttendu']) !== null,
     ).length;
   }
 
@@ -102,9 +114,13 @@ export class AdminDashboardComponent implements OnChanges, OnDestroy {
 
   amount(value: unknown): string {
     const number = this.numeric(value);
-    return number === null ? '—' : new Intl.NumberFormat('fr-MA', {
-      style: 'currency', currency: 'MAD', maximumFractionDigits: 0,
-    }).format(number);
+    return number === null
+      ? '—'
+      : new Intl.NumberFormat('fr-MA', {
+          style: 'currency',
+          currency: 'MAD',
+          maximumFractionDigits: 0,
+        }).format(number);
   }
 
   quantity(value: number): string {
@@ -128,7 +144,10 @@ export class AdminDashboardComponent implements OnChanges, OnDestroy {
   private rows(key: string): ApiRow[] {
     const value = this.dashboard?.[key];
     return Array.isArray(value)
-      ? value.filter((item): item is ApiRow => typeof item === 'object' && item !== null && !Array.isArray(item))
+      ? value.filter(
+          (item): item is ApiRow =>
+            typeof item === 'object' && item !== null && !Array.isArray(item),
+        )
       : [];
   }
 
@@ -141,7 +160,11 @@ export class AdminDashboardComponent implements OnChanges, OnDestroy {
       const date = new Date(currentMonday);
       date.setDate(date.getDate() - (7 - index) * 7);
       const start = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-      return { start, label: date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }), hours: 0 };
+      return {
+        start,
+        label: date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }),
+        hours: 0,
+      };
     });
     const byWeek = new Map(weeks.map((week) => [week.start, week]));
     for (const sheet of sheets) {
@@ -153,7 +176,12 @@ export class AdminDashboardComponent implements OnChanges, OnDestroy {
       }
       const date = sheet['semaineDebut'];
       const hours = this.numeric(sheet['totalHeuresSemaine']);
-      if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) || hours === null || hours < 0) {
+      if (
+        typeof date !== 'string' ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+        hours === null ||
+        hours < 0
+      ) {
         throw new Error('Données des feuilles de temps validées invalides.');
       }
       const week = byWeek.get(date);

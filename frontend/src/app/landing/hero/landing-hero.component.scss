@@ -26,7 +26,13 @@
   &::after {
     position: absolute;
     inset: 0;
-    background: linear-gradient(90deg, rgba(28, 45, 62, 0.98) 0%, rgba(32, 49, 66, 0.9) 34%, rgba(32, 49, 66, 0.38) 72%, rgba(32, 49, 66, 0.18) 100%);
+    background: linear-gradient(
+      90deg,
+      rgba(28, 45, 62, 0.98) 0%,
+      rgba(32, 49, 66, 0.9) 34%,
+      rgba(32, 49, 66, 0.38) 72%,
+      rgba(32, 49, 66, 0.18) 100%
+    );
     content: '';
     pointer-events: none;
   }
@@ -115,7 +121,10 @@ h1 {
   font-size: 15px;
   font-weight: 600;
   text-decoration: none;
-  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    border-color 180ms ease;
 }
 
 .button-primary {
@@ -262,7 +271,13 @@ h1 {
 }
 
 :host-context([dir='rtl']) .hero-section::after {
-  background: linear-gradient(270deg, rgba(28, 45, 62, 0.98) 0%, rgba(32, 49, 66, 0.9) 34%, rgba(32, 49, 66, 0.38) 72%, rgba(32, 49, 66, 0.18) 100%);
+  background: linear-gradient(
+    270deg,
+    rgba(28, 45, 62, 0.98) 0%,
+    rgba(32, 49, 66, 0.9) 34%,
+    rgba(32, 49, 66, 0.38) 72%,
+    rgba(32, 49, 66, 0.18) 100%
+  );
 }
 
 @media (max-width: 600px) {

@@ -17,3 +17,9 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.H2Dialect
+
+application:
+  security:
+    jwt:
+        secret-key: test-jwt-secret-key-at-least-32-bytes
+    internal-api-key: test-internal-api-key

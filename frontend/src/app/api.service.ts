@@ -51,9 +51,7 @@ export class ApiService {
 
   async download(path: string, filename: string): Promise<void> {
     const headers = this.headers();
-    const blob = await firstValueFrom(
-      this.http.get(path, { headers, responseType: 'blob' }),
-    );
+    const blob = await firstValueFrom(this.http.get(path, { headers, responseType: 'blob' }));
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -62,11 +60,7 @@ export class ApiService {
     URL.revokeObjectURL(url);
   }
 
-  private async request<T>(
-    path: string,
-    method: string,
-    body?: unknown,
-  ): Promise<T> {
+  private async request<T>(path: string, method: string, body?: unknown): Promise<T> {
     try {
       return await firstValueFrom(
         this.http.request<T>(method, path, {
@@ -79,22 +73,18 @@ export class ApiService {
       if (message.status === 401) {
         this.clearToken();
       }
-      throw new Error(message.message);
+      throw new Error(message.message, { cause: error });
     }
   }
 
   private headers(): HttpHeaders {
     const token = this.token;
-    return token
-      ? new HttpHeaders({ Authorization: `Bearer ${token}` })
-      : new HttpHeaders();
+    return token ? new HttpHeaders({ Authorization: `Bearer ${token}` }) : new HttpHeaders();
   }
 
   private errorMessage(error: unknown): { status: number; message: string } {
     if (error instanceof HttpErrorResponse) {
-      const errorBody = error.error as
-        | { message?: string; error?: string }
-        | undefined;
+      const errorBody = error.error as { message?: string; error?: string } | undefined;
       return {
         status: error.status,
         message: errorBody?.message ?? errorBody?.error ?? `Erreur HTTP ${error.status}`,

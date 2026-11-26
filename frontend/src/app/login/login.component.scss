@@ -68,7 +68,9 @@ form {
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fff;
-  transition: border-color 180ms ease, box-shadow 180ms ease;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease;
 
   &:focus-within {
     border-color: var(--green);
@@ -196,7 +198,9 @@ form {
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 180ms ease, opacity 180ms ease;
+  transition:
+    background-color 180ms ease,
+    opacity 180ms ease;
 
   &:hover:not(:disabled) {
     background: var(--green-dark);

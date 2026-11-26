@@ -5,11 +5,15 @@
       <h2>Une vision claire de votre activité</h2>
     </div>
     <div class="stats-grid">
-      @for (stat of [
-        { value: counts()[0], label: 'profils utilisateurs' },
-        { value: counts()[1], label: 'modules intégrés' },
-        { value: counts()[2], label: 'analyses automatiques' }
-      ]; track stat.label; let index = $index) {
+      @for (
+        stat of [
+          { value: counts()[0], label: 'profils utilisateurs' },
+          { value: counts()[1], label: 'modules intégrés' },
+          { value: counts()[2], label: 'analyses automatiques' },
+        ];
+        track stat.label;
+        let index = $index
+      ) {
         <div class="stat-item" appReveal [style.--reveal-delay]="index * 100 + 'ms'">
           <strong>{{ stat.value }}</strong>
           <span>{{ stat.label }}</span>

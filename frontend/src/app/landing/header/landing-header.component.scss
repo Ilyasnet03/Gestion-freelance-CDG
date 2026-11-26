@@ -10,7 +10,9 @@
   position: relative;
   color: #fff;
   background: #243647;
-  transition: background-color 220ms ease, box-shadow 220ms ease;
+  transition:
+    background-color 220ms ease,
+    box-shadow 220ms ease;
 
   &.is-scrolled {
     background: #243647;

@@ -15,7 +15,7 @@ public class FastApiClientService {
     @Value("${application.analytics.fastapi-url:http://localhost:8000}")
     private String fastApiUrl;
 
-    @Value("${application.security.internal-api-key:cdg-internal-secret-api-key-2026}")
+    @Value("${application.security.internal-api-key}")
     private String internalApiKey;
 
     private final RestClient restClient;

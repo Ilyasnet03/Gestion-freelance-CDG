@@ -19,7 +19,11 @@ body {
   margin: 0;
   color: var(--color-grey-900);
   background: var(--color-grey-50);
-  font: 16px/1.6 Roboto, 'Segoe UI', Arial, sans-serif;
+  font:
+    16px/1.6 Roboto,
+    'Segoe UI',
+    Arial,
+    sans-serif;
 }
 
 button,
@@ -33,12 +37,29 @@ a {
   color: var(--color-primary-dark);
 }
 
-.data-table { min-width: 680px; }
-.data-table .p-datatable-table { width: 100%; }
-.data-table .p-datatable-thead > tr > th { font-size: 13px; white-space: nowrap; }
-.data-table .p-datatable-tbody > tr > td { font-size: 14px; }
-.data-table p-progressbar { display: block; width: 100px; margin-bottom: 5px; }
-.data-table small { display: block; color: var(--color-grey-600); font-size: 12px; }
+.data-table {
+  min-width: 680px;
+}
+.data-table .p-datatable-table {
+  width: 100%;
+}
+.data-table .p-datatable-thead > tr > th {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.data-table .p-datatable-tbody > tr > td {
+  font-size: 14px;
+}
+.data-table p-progressbar {
+  display: block;
+  width: 100px;
+  margin-bottom: 5px;
+}
+.data-table small {
+  display: block;
+  color: var(--color-grey-600);
+  font-size: 12px;
+}
 
 .app-reveal {
   transition:
@@ -67,9 +88,9 @@ a {
   *::before,
   *::after {
     scroll-behavior: auto !important;
-    animation-duration: .01ms !important;
+    animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: .01ms !important;
+    transition-duration: 0.01ms !important;
   }
 
   html {

@@ -10,9 +10,17 @@ import { routes } from './app.routes';
 const CdgTheme = definePreset(Aura, {
   semantic: {
     primary: {
-      50: '#f5f8ee', 100: '#eaf2db', 200: '#d3e3b8', 300: '#b7d08b',
-      400: '#95b85a', 500: '#628a1a', 600: '#557b17', 700: '#4f6f15',
-      800: '#3f5a10', 900: '#344a0e', 950: '#1b2806',
+      50: '#f5f8ee',
+      100: '#eaf2db',
+      200: '#d3e3b8',
+      300: '#b7d08b',
+      400: '#95b85a',
+      500: '#628a1a',
+      600: '#557b17',
+      700: '#4f6f15',
+      800: '#3f5a10',
+      900: '#344a0e',
+      950: '#1b2806',
     },
   },
 });
@@ -31,5 +39,5 @@ export const appConfig: ApplicationConfig = {
       },
     }),
     DialogService,
-  ]
+  ],
 };

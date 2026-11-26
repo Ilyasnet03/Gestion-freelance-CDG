@@ -1,11 +1,5 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectorRef,
-  Component,
-  DestroyRef,
-  OnInit,
-  inject,
-} from '@angular/core';
+import { ChangeDetectorRef, Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
@@ -318,7 +312,8 @@ export class App implements OnInit {
   get detailColumnKeys(): string[] {
     return [
       ...this.detailColumns.map((column) => column.key),
-      ...((this.currentView === 'projects' && this.user?.role === 'CHEF_PROJET') || this.canEditSelectedSheet
+      ...((this.currentView === 'projects' && this.user?.role === 'CHEF_PROJET') ||
+      this.canEditSelectedSheet
         ? ['actions']
         : []),
     ];
@@ -346,8 +341,9 @@ export class App implements OnInit {
   }
 
   setTimesheetStatusFilter(value: string): void {
-    this.timesheetStatusFilter =
-      ['BROUILLON', 'SOUMISE', 'VALIDEE', 'REJETEE'].includes(value) ? value : '';
+    this.timesheetStatusFilter = ['BROUILLON', 'SOUMISE', 'VALIDEE', 'REJETEE'].includes(value)
+      ? value
+      : '';
     this.invalidateViewCaches('timesheets');
     void this.loadView();
   }
@@ -396,15 +392,8 @@ export class App implements OnInit {
     this.error = '';
     this.loading = true;
     try {
-      const response = await this.api.post<{
-        token: string;
-        utilisateur: AuthUser;
-      }>('/api/auth/login', {
-        email: this.email.trim(),
-        motDePasse: this.password,
-      });
-      this.api.setToken(response.token);
-      this.user = response.utilisateur;
+      const user = await this.auth.login(this.email, this.password);
+      this.user = user;
       if (this.remembered) {
         localStorage.setItem('cdg-remembered-email', this.email.trim());
       } else {
@@ -445,9 +434,8 @@ export class App implements OnInit {
     const generation = ++this.viewLoadGeneration;
     const requestedView = this.currentView;
     const requestedTimesheetStatus = this.timesheetStatusFilter;
-    const cacheKey = requestedView === 'timesheets'
-      ? `timesheets:${requestedTimesheetStatus}`
-      : requestedView;
+    const cacheKey =
+      requestedView === 'timesheets' ? `timesheets:${requestedTimesheetStatus}` : requestedView;
     const existingLoad = this.activeViewLoads.get(cacheKey);
     if (existingLoad) {
       await existingLoad;
@@ -590,9 +578,30 @@ export class App implements OnInit {
       const fields: ActionDialogField[] = [
         { key: 'code', label: 'Code du projet', type: 'text', required: true },
         { key: 'nom', label: 'Nom du projet', type: 'text', required: true },
-        { key: 'budget', label: 'Budget (MAD)', type: 'number', required: true, min: 1, step: 0.01 },
-        { key: 'heuresPrevues', label: 'Heures prévues du projet', type: 'number', required: true, min: 0.01, step: 0.01 },
-        { key: 'nombreTachesPrevues', label: 'Nombre de tâches prévues', type: 'number', required: true, min: 1, step: 1 },
+        {
+          key: 'budget',
+          label: 'Budget (MAD)',
+          type: 'number',
+          required: true,
+          min: 1,
+          step: 0.01,
+        },
+        {
+          key: 'heuresPrevues',
+          label: 'Heures prévues du projet',
+          type: 'number',
+          required: true,
+          min: 0.01,
+          step: 0.01,
+        },
+        {
+          key: 'nombreTachesPrevues',
+          label: 'Nombre de tâches prévues',
+          type: 'number',
+          required: true,
+          min: 1,
+          step: 1,
+        },
         { key: 'dateDebut', label: 'Date de début', type: 'date', required: true },
         { key: 'dateFinPrevue', label: 'Date de fin prévue', type: 'date', required: true },
         {
@@ -726,9 +735,7 @@ export class App implements OnInit {
       if (this.currentView === 'projects') {
         this.selectedProject = row;
         this.detailTitle = `${this.text(row, 'nom')} — tâches`;
-        this.detailRows = await this.api.get<ApiRow[]>(
-          `/api/projets/${id}/taches`,
-        );
+        this.detailRows = await this.api.get<ApiRow[]>(`/api/projets/${id}/taches`);
         this.projectAssignments = this.canManage
           ? await this.api.get<ApiRow[]>(`/api/projets/${id}/affectations`)
           : [];
@@ -739,9 +746,7 @@ export class App implements OnInit {
         const sheet = await this.api.get<ApiRow>(`/api/timesheets/${id}`);
         this.selectedSheet = sheet;
         this.detailTitle = `Feuille de temps — ${this.formatDate(this.text(sheet, 'semaineDebut'))}`;
-        this.detailRows = Array.isArray(sheet['lignes'])
-          ? (sheet['lignes'] as ApiRow[])
-          : [];
+        this.detailRows = Array.isArray(sheet['lignes']) ? (sheet['lignes'] as ApiRow[]) : [];
         if (this.canEditSelectedSheet) {
           this.taskOptions = await this.api.get<ApiRow[]>('/api/mes-missions?disponibles=true');
         } else {
@@ -772,7 +777,10 @@ export class App implements OnInit {
     if (this.currentView === 'freelancers') return 'Modifier';
     if (this.currentView === 'my-missions') return 'Consulter la mission';
     if (this.currentView === 'timesheets') {
-      if (this.user?.role === 'FREELANCE' && ['BROUILLON', 'REJETEE'].includes(this.text(row, 'statut'))) {
+      if (
+        this.user?.role === 'FREELANCE' &&
+        ['BROUILLON', 'REJETEE'].includes(this.text(row, 'statut'))
+      ) {
         return 'Détails / saisir';
       }
       if (this.text(row, 'statut') === 'SOUMISE' && this.user?.role === 'CHEF_PROJET') {
@@ -780,9 +788,11 @@ export class App implements OnInit {
       }
       return 'Détails';
     }
-    if (this.currentView === 'billing') return this.text(row, 'statut') === 'PAYE' ? 'Payé' : 'Marquer payé';
+    if (this.currentView === 'billing')
+      return this.text(row, 'statut') === 'PAYE' ? 'Payé' : 'Marquer payé';
     if (this.currentView === 'my-pvs') return 'Télécharger PDF';
-    if (this.currentView === 'analysis') return this.bool(row, 'traitee') ? 'Traitée' : 'Marquer traitée';
+    if (this.currentView === 'analysis')
+      return this.bool(row, 'traitee') ? 'Traitée' : 'Marquer traitée';
     if (this.currentView === 'users') return this.bool(row, 'actif') ? 'Désactiver' : 'Activer';
     if (this.currentView === 'settings') return 'Modifier la valeur';
     return '';
@@ -833,15 +843,32 @@ export class App implements OnInit {
       } else if (this.currentView === 'freelancers') {
         const values = await this.showActionDialog({
           title: 'Modifier le profil freelance',
-          description: this.user?.role === 'ADMIN'
-            ? `Mettez à jour le TJM et la spécialité de ${this.text(row, 'nomComplet')}.`
-            : `Mettez à jour la spécialité de ${this.text(row, 'nomComplet')}.`,
+          description:
+            this.user?.role === 'ADMIN'
+              ? `Mettez à jour le TJM et la spécialité de ${this.text(row, 'nomComplet')}.`
+              : `Mettez à jour la spécialité de ${this.text(row, 'nomComplet')}.`,
           submitLabel: 'Enregistrer',
           fields: [
             ...(this.user?.role === 'ADMIN'
               ? [
-                  { key: 'tjm', label: 'TJM (MAD)', type: 'number' as const, required: true, min: 0.01, step: 0.01 },
-                  { key: 'seuilHeuresJour', label: "Seuil d'alerte (h/j)", type: 'number' as const, required: true, min: 0.01, max: 10, step: 0.01, hint: 'Au-delà de 10 h/j, la saisie est bloquée.' },
+                  {
+                    key: 'tjm',
+                    label: 'TJM (MAD)',
+                    type: 'number' as const,
+                    required: true,
+                    min: 0.01,
+                    step: 0.01,
+                  },
+                  {
+                    key: 'seuilHeuresJour',
+                    label: "Seuil d'alerte (h/j)",
+                    type: 'number' as const,
+                    required: true,
+                    min: 0.01,
+                    max: 10,
+                    step: 0.01,
+                    hint: 'Au-delà de 10 h/j, la saisie est bloquée.',
+                  },
                 ]
               : []),
             { key: 'specialite', label: 'Spécialité', type: 'text', required: true },
@@ -855,7 +882,9 @@ export class App implements OnInit {
         if (!values) return;
         await this.api.put(`/api/freelances/${id}`, {
           tjm: this.user?.role === 'ADMIN' ? Number(values['tjm']) : this.number(row, 'tjm'),
-          ...(this.user?.role === 'ADMIN' ? { seuilHeuresJour: Number(values['seuilHeuresJour']) } : {}),
+          ...(this.user?.role === 'ADMIN'
+            ? { seuilHeuresJour: Number(values['seuilHeuresJour']) }
+            : {}),
           specialite: String(values['specialite'] ?? ''),
           statut: this.text(row, 'statut'),
         });
@@ -875,10 +904,7 @@ export class App implements OnInit {
           await this.api.post<ApiRow>(`/api/timesheets/${id}/valider`);
           row['statut'] = 'VALIDEE';
           this.notify('Feuille validée.');
-        } else if (
-          this.user?.role === 'FREELANCE' &&
-          ['BROUILLON', 'REJETEE'].includes(status)
-        ) {
+        } else if (this.user?.role === 'FREELANCE' && ['BROUILLON', 'REJETEE'].includes(status)) {
           await this.openDetails(row);
         } else {
           await this.openDetails(row);
@@ -944,9 +970,8 @@ export class App implements OnInit {
   async submitSheet(row: ApiRow): Promise<void> {
     if (this.actionInProgress) return;
     const id = this.number(row, 'id');
-    let confirmed = false;
     try {
-      confirmed = await this.confirmAction(
+      const confirmed = await this.confirmAction(
         'Soumettre cette feuille ?',
         'La feuille sera transmise au chef de projet pour validation.',
         'Confirmer la soumission',
@@ -972,9 +997,7 @@ export class App implements OnInit {
       description: 'Indiquez le motif afin que le freelance puisse corriger sa saisie.',
       submitLabel: 'Rejeter la feuille',
       danger: true,
-      fields: [
-        { key: 'motif', label: 'Motif du rejet', type: 'textarea', required: true },
-      ],
+      fields: [{ key: 'motif', label: 'Motif du rejet', type: 'textarea', required: true }],
     });
     const motif = String(values?.['motif'] ?? '').trim();
     if (!motif) return;
@@ -994,12 +1017,15 @@ export class App implements OnInit {
   async addHours(): Promise<void> {
     if (!this.selectedSheet) return;
     if (!this.taskOptions.length) {
-      this.setError("Aucune tâche disponible : les heures prévues sont atteintes ou aucune mission n'est affectée.");
+      this.setError(
+        "Aucune tâche disponible : les heures prévues sont atteintes ou aucune mission n'est affectée.",
+      );
       return;
     }
     const values = await this.showActionDialog({
       title: 'Ajouter des heures',
-      description: 'Saisissez le temps consacré à une tâche. Le total journalier ne peut dépasser 10 h.',
+      description:
+        'Saisissez le temps consacré à une tâche. Le total journalier ne peut dépasser 10 h.',
       submitLabel: 'Ajouter la saisie',
       fields: [
         {
@@ -1013,7 +1039,15 @@ export class App implements OnInit {
           })),
         },
         { key: 'dateSaisie', label: 'Date', type: 'date', required: true },
-        { key: 'heures', label: 'Heures', type: 'number', required: true, min: 0.01, max: 10, step: 0.25 },
+        {
+          key: 'heures',
+          label: 'Heures',
+          type: 'number',
+          required: true,
+          min: 0.01,
+          max: 10,
+          step: 0.25,
+        },
       ],
       values: { dateSaisie: this.text(this.selectedSheet, 'semaineDebut') },
     });
@@ -1046,7 +1080,15 @@ export class App implements OnInit {
           description: `Avancement de « ${this.text(row, 'titre')} ».`,
           submitLabel: 'Enregistrer',
           fields: [
-            { key: 'avancement', label: 'Avancement (%)', type: 'number', required: true, min: 0, max: 100, step: 1 },
+            {
+              key: 'avancement',
+              label: 'Avancement (%)',
+              type: 'number',
+              required: true,
+              min: 0,
+              max: 100,
+              step: 1,
+            },
           ],
           values: { avancement: this.number(row, 'avancement') },
         });
@@ -1101,7 +1143,14 @@ export class App implements OnInit {
               label: `${this.text(person, 'prenom')} ${this.text(person, 'nom')}`,
             })),
           },
-          { key: 'tjmApplique', label: 'TJM appliqué (MAD)', type: 'number', required: true, min: 0.01, step: 0.01 },
+          {
+            key: 'tjmApplique',
+            label: 'TJM appliqué (MAD)',
+            type: 'number',
+            required: true,
+            min: 0.01,
+            step: 0.01,
+          },
           { key: 'dateDebut', label: 'Date de début', type: 'date', required: true },
           { key: 'dateFin', label: 'Date de fin', type: 'date', hint: 'Facultative' },
         ],
@@ -1112,15 +1161,12 @@ export class App implements OnInit {
         },
       });
       if (!values) return;
-      await this.api.post(
-        `/api/projets/${this.number(this.selectedProject, 'id')}/affectations`,
-        {
-          freelanceId: Number(values['freelanceId']),
-          tjmApplique: Number(values['tjmApplique']),
-          dateDebut: values['dateDebut'],
-          dateFin: values['dateFin'] || null,
-        },
-      );
+      await this.api.post(`/api/projets/${this.number(this.selectedProject, 'id')}/affectations`, {
+        freelanceId: Number(values['freelanceId']),
+        tjmApplique: Number(values['tjmApplique']),
+        dateDebut: values['dateDebut'],
+        dateFin: values['dateFin'] || null,
+      });
       await this.openDetails(this.selectedProject);
       this.invalidateViewCaches('projects', 'dashboard', 'my-missions');
       this.notify('Freelance affecté au projet.');
@@ -1143,9 +1189,30 @@ export class App implements OnInit {
         fields: [
           { key: 'nom', label: 'Nom du projet', type: 'text', required: true },
           { key: 'description', label: 'Description', type: 'textarea' },
-          { key: 'budget', label: 'Budget (MAD)', type: 'number', required: true, min: 1, step: 0.01 },
-          { key: 'heuresPrevues', label: 'Heures prévues du projet', type: 'number', required: true, min: 0.01, step: 0.01 },
-          { key: 'nombreTachesPrevues', label: 'Nombre de tâches prévues', type: 'number', required: true, min: 1, step: 1 },
+          {
+            key: 'budget',
+            label: 'Budget (MAD)',
+            type: 'number',
+            required: true,
+            min: 1,
+            step: 0.01,
+          },
+          {
+            key: 'heuresPrevues',
+            label: 'Heures prévues du projet',
+            type: 'number',
+            required: true,
+            min: 0.01,
+            step: 0.01,
+          },
+          {
+            key: 'nombreTachesPrevues',
+            label: 'Nombre de tâches prévues',
+            type: 'number',
+            required: true,
+            min: 1,
+            step: 1,
+          },
           { key: 'dateDebut', label: 'Date de début', type: 'date', required: true },
           { key: 'dateFinPrevue', label: 'Date de fin prévue', type: 'date', required: true },
           {
@@ -1175,8 +1242,12 @@ export class App implements OnInit {
           nom: this.text(project, 'nom'),
           description: this.text(project, 'description'),
           budget: this.number(project, 'budget'),
-          heuresPrevues: project['heuresPrevues'] == null ? '' : this.number(project, 'heuresPrevues'),
-          nombreTachesPrevues: project['nombreTachesPrevues'] == null ? '' : this.number(project, 'nombreTachesPrevues'),
+          heuresPrevues:
+            project['heuresPrevues'] == null ? '' : this.number(project, 'heuresPrevues'),
+          nombreTachesPrevues:
+            project['nombreTachesPrevues'] == null
+              ? ''
+              : this.number(project, 'nombreTachesPrevues'),
           dateDebut: this.text(project, 'dateDebut'),
           dateFinPrevue: this.text(project, 'dateFinPrevue'),
           typeProjetId: this.number(project, 'typeProjetId'),
@@ -1184,20 +1255,17 @@ export class App implements OnInit {
         },
       });
       if (!values) return;
-      const updated = await this.api.put<ApiRow>(
-        `/api/projets/${this.number(project, 'id')}`,
-        {
-          nom: String(values['nom'] ?? '').trim(),
-          description: values['description'] ?? '',
-          budget: Number(values['budget']),
-          heuresPrevues: Number(values['heuresPrevues']),
-          nombreTachesPrevues: Number(values['nombreTachesPrevues']),
-          dateDebut: values['dateDebut'],
-          dateFinPrevue: values['dateFinPrevue'],
-          typeProjetId: Number(values['typeProjetId']),
-          statut: values['statut'],
-        },
-      );
+      const updated = await this.api.put<ApiRow>(`/api/projets/${this.number(project, 'id')}`, {
+        nom: String(values['nom'] ?? '').trim(),
+        description: values['description'] ?? '',
+        budget: Number(values['budget']),
+        heuresPrevues: Number(values['heuresPrevues']),
+        nombreTachesPrevues: Number(values['nombreTachesPrevues']),
+        dateDebut: values['dateDebut'],
+        dateFinPrevue: values['dateFinPrevue'],
+        typeProjetId: Number(values['typeProjetId']),
+        statut: values['statut'],
+      });
       this.selectedProject = updated;
       this.detailTitle = `${this.text(updated, 'nom')} — tâches`;
       this.notify('Projet modifié.');
@@ -1216,8 +1284,23 @@ export class App implements OnInit {
       submitLabel: 'Enregistrer',
       fields: [
         { key: 'titre', label: 'Intitulé de la tâche', type: 'text', required: true },
-        { key: 'heuresPrevues', label: 'Heures prévues', type: 'number', required: true, min: 0.01, step: 0.01 },
-        { key: 'avancement', label: 'Avancement (%)', type: 'number', required: true, min: 0, max: 100, step: 1 },
+        {
+          key: 'heuresPrevues',
+          label: 'Heures prévues',
+          type: 'number',
+          required: true,
+          min: 0.01,
+          step: 0.01,
+        },
+        {
+          key: 'avancement',
+          label: 'Avancement (%)',
+          type: 'number',
+          required: true,
+          min: 0,
+          max: 100,
+          step: 1,
+        },
         {
           key: 'statut',
           label: 'Statut',
@@ -1273,7 +1356,15 @@ export class App implements OnInit {
     if (!this.selectedProject) return;
     const fields = [
       { key: 'titre', label: 'Intitulé de la tâche', type: 'text' as const, required: true },
-      { key: 'heuresPrevues', label: 'Heures prévues', type: 'number' as const, required: true, min: 0.01, step: 0.01, hint: 'Par défaut : heures du projet divisées par le nombre de tâches prévues.' },
+      {
+        key: 'heuresPrevues',
+        label: 'Heures prévues',
+        type: 'number' as const,
+        required: true,
+        min: 0.01,
+        step: 0.01,
+        hint: 'Par défaut : heures du projet divisées par le nombre de tâches prévues.',
+      },
       {
         key: 'affectationId',
         label: 'Freelance affecté',
@@ -1295,26 +1386,29 @@ export class App implements OnInit {
       submitLabel: 'Créer la tâche',
       fields,
       values: {
-        heuresPrevues: this.number(this.selectedProject, 'heuresPrevues') > 0
-          && this.number(this.selectedProject, 'nombreTachesPrevues') > 0
-          ? Number((this.number(this.selectedProject, 'heuresPrevues') / this.number(this.selectedProject, 'nombreTachesPrevues')).toFixed(2))
-          : '',
+        heuresPrevues:
+          this.number(this.selectedProject, 'heuresPrevues') > 0 &&
+          this.number(this.selectedProject, 'nombreTachesPrevues') > 0
+            ? Number(
+                (
+                  this.number(this.selectedProject, 'heuresPrevues') /
+                  this.number(this.selectedProject, 'nombreTachesPrevues')
+                ).toFixed(2),
+              )
+            : '',
       },
     });
     if (!values) return;
     const titre = String(values['titre'] ?? '').trim();
     if (!titre) return;
     try {
-      await this.api.post(
-        `/api/projets/${this.number(this.selectedProject, 'id')}/taches`,
-        {
-          titre,
-          heuresPrevues: Number(values['heuresPrevues']),
-          affectationId: values['affectationId'] ? Number(values['affectationId']) : null,
-          dateDebut: values['dateDebut'] || null,
-          dateFin: values['dateFin'] || null,
-        },
-      );
+      await this.api.post(`/api/projets/${this.number(this.selectedProject, 'id')}/taches`, {
+        titre,
+        heuresPrevues: Number(values['heuresPrevues']),
+        affectationId: values['affectationId'] ? Number(values['affectationId']) : null,
+        dateDebut: values['dateDebut'] || null,
+        dateFin: values['dateFin'] || null,
+      });
       await this.openDetails(this.selectedProject);
       this.notify('Tâche créée.');
       this.invalidateViewCaches('projects', 'dashboard', 'my-missions');
@@ -1343,7 +1437,12 @@ export class App implements OnInit {
             { value: 'FREELANCE', label: 'Freelance' },
           ],
         },
-        { key: 'motDePasse', label: 'Nouveau mot de passe', type: 'password', hint: 'Laissez vide pour le conserver' },
+        {
+          key: 'motDePasse',
+          label: 'Nouveau mot de passe',
+          type: 'password',
+          hint: 'Laissez vide pour le conserver',
+        },
       ],
       values: {
         prenom: this.text(row, 'prenom'),
@@ -1510,9 +1609,7 @@ export class App implements OnInit {
     }).format(Number(value ?? 0));
   }
 
-  private async showActionDialog(
-    data: ActionDialogData,
-  ): Promise<ActionDialogResult | null> {
+  private async showActionDialog(data: ActionDialogData): Promise<ActionDialogResult | null> {
     const ref = this.dialog.open(ActionDialogComponent, {
       header: data.title,
       width: '640px',

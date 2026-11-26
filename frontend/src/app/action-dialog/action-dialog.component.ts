@@ -15,14 +15,7 @@ import { TextareaModule } from 'primeng/textarea';
 
 export type DialogFieldValue = string | number | null;
 export type DialogFieldType =
-  | 'text'
-  | 'email'
-  | 'number'
-  | 'date'
-  | 'month'
-  | 'password'
-  | 'select'
-  | 'textarea';
+  'text' | 'email' | 'number' | 'date' | 'month' | 'password' | 'select' | 'textarea';
 
 export interface DialogFieldOption {
   value: string | number;
@@ -87,10 +80,7 @@ export class ActionDialogComponent {
 
       this.form.addControl(
         field.key,
-        new FormControl<DialogFieldValue>(
-          this.data.values?.[field.key] ?? '',
-          { validators },
-        ),
+        new FormControl<DialogFieldValue>(this.data.values?.[field.key] ?? '', { validators }),
       );
     }
   }
@@ -105,9 +95,7 @@ export class ActionDialogComponent {
   }
 
   hasVisibleErrors(): boolean {
-    return this.data.fields.some(
-      (field) => this.isVisible(field) && this.control(field).invalid,
-    );
+    return this.data.fields.some((field) => this.isVisible(field) && this.control(field).invalid);
   }
 
   errorText(field: ActionDialogField): string {
