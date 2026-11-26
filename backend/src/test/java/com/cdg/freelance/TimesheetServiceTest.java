@@ -87,7 +87,7 @@ public class TimesheetServiceTest {
         timesheet.setFreelance(freelance);
         // Find a recent Monday
         LocalDate monday = LocalDate.now();
-        while (monday.getDayOfWeek() != DayOfWeek.MONDAY) {
+        while (!DayOfWeek.MONDAY.equals(monday.getDayOfWeek())) {
             monday = monday.minusDays(1);
         }
         timesheet.setSemaineDebut(monday);

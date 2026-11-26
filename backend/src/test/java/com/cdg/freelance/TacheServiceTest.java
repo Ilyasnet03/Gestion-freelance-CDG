@@ -2,6 +2,7 @@ package com.cdg.freelance;
 
 import com.cdg.freelance.dto.tache.CreateTacheRequest;
 import com.cdg.freelance.dto.tache.TacheDto;
+import com.cdg.freelance.dto.tache.UpdateAvancementRequest;
 import com.cdg.freelance.dto.tache.UpdateTacheRequest;
 import com.cdg.freelance.entity.*;
 import com.cdg.freelance.exception.BusinessException;
@@ -102,5 +103,47 @@ class TacheServiceTest {
 
         assertEquals(1, service.listMesMissions(new UserPrincipal(user), true).size());
         assertEquals(2, service.listMesMissions(new UserPrincipal(user), false).size());
+    }
+
+    @Test
+    void taskDatesCannotBeOutsideProjectPeriod() {
+        Projet project = new Projet();
+        project.setDateDebut(java.time.LocalDate.of(2026, 1, 1));
+        project.setDateFinPrevue(java.time.LocalDate.of(2026, 12, 31));
+        CreateTacheRequest request = new CreateTacheRequest();
+        request.setTitre("Tâche");
+        request.setHeuresPrevues(new BigDecimal("8"));
+        request.setDateDebut(java.time.LocalDate.of(2025, 12, 31));
+
+        when(projetRepository.findById(1L)).thenReturn(Optional.of(project));
+
+        assertThrows(BusinessException.class, () -> service.createTache(1L, request));
+        verify(tacheRepository, never()).save(any());
+    }
+
+    @Test
+    void settingProgressToZeroResetsTaskStatusToTodo() {
+        Projet project = new Projet();
+        Tache task = new Tache();
+        task.setProjet(project);
+        task.setTitre("Tâche");
+        task.setHeuresPrevues(new BigDecimal("8"));
+        task.setAvancement(50);
+        task.setStatut(TacheStatut.EN_COURS);
+
+        Utilisateur chef = new Utilisateur("Chef", "CDG", "chef@cdg.ma", "hash", Role.CHEF_PROJET, true);
+        chef.setId(20L);
+        project.setChefProjet(chef);
+
+        UpdateAvancementRequest request = new UpdateAvancementRequest();
+        request.setAvancement(0);
+        when(tacheRepository.findById(1L)).thenReturn(Optional.of(task));
+        when(tacheRepository.save(task)).thenReturn(task);
+        when(mapper.toTacheDto(task)).thenReturn(new TacheDto());
+
+        service.updateAvancement(1L, request, new UserPrincipal(chef));
+
+        assertEquals(0, task.getAvancement());
+        assertEquals(TacheStatut.A_FAIRE, task.getStatut());
     }
 }

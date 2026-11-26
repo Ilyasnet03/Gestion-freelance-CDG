@@ -141,7 +141,8 @@ public class ProjetService {
                 .orElseThrow(() -> new ResourceNotFoundException("Projet non trouvé avec l'id : " + id));
         ensureProjectAccess(p, currentUser);
 
-        if (req.getChefProjetId() != null
+        if (currentUser.getRole() == Role.CHEF_PROJET
+                && req.getChefProjetId() != null
                 && !req.getChefProjetId().equals(currentUser.getId())) {
             throw new AccessDeniedException("Un chef de projet ne peut pas transférer son projet à un autre compte");
         }
@@ -181,6 +182,9 @@ public class ProjetService {
     @Transactional
     public AffectationDto addAffectation(Long projetId, CreateAffectationRequest req, UserPrincipal currentUser) {
         requireProjectManager(currentUser);
+        if (req.getDateFin() != null && req.getDateFin().isBefore(req.getDateDebut())) {
+            throw new BusinessException("La date de fin de l'affectation doit être postérieure ou égale à sa date de début");
+        }
         Projet projet = projetRepository.findById(projetId)
                 .orElseThrow(() -> new ResourceNotFoundException("Projet non trouvé avec l'id : " + projetId));
         ensureProjectAccess(projet, currentUser);

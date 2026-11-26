@@ -19,3 +19,4 @@ backend/uploads/pv/
 
 .DS_Store
 Thumbs.db
+.qodana/

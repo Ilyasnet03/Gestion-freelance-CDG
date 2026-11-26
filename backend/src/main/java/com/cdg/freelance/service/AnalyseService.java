@@ -14,15 +14,10 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -232,34 +227,8 @@ public class AnalyseService {
                 .filter(java.util.Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        List<String> lines = new ArrayList<>();
-        lines.add("RAPPORT MENSUEL DE PILOTAGE - CDG");
-        lines.add("Periode : " + month);
-        lines.add("Genere le : " + LocalDate.now());
-        lines.add("Profil : " + currentUser.getRole());
-        lines.add("");
-        lines.add("SYNTHESE");
-        lines.add("Projets visibles : " + projects.size());
-        lines.add("Budget total : " + totalBudget + " MAD");
-        lines.add("Budget consomme : " + consumedBudget + " MAD");
-        lines.add("Alertes emises durant le mois : " + monthAlerts.size());
-        lines.add("");
-        lines.add("DETAIL DES PROJETS");
-        for (ProjetDto project : projects) {
-            lines.add(project.getCode() + " - " + project.getNom());
-            lines.add("  Statut : " + project.getStatut() + " | Avancement : "
-                    + (project.getAvancementGlobal() == null ? 0 : project.getAvancementGlobal()) + " %");
-            lines.add("  Budget : " + project.getBudgetConsomme() + " / " + project.getBudget() + " MAD");
-        }
-        lines.add("");
-        lines.add("ALERTES DU MOIS");
-        if (monthAlerts.isEmpty()) {
-            lines.add("Aucune alerte emise durant cette periode.");
-        } else {
-            monthAlerts.forEach(alert -> lines.add(alert.getNiveau() + " | " + alert.getProjetCode()
-                    + " | " + alert.getMessage()));
-        }
-        return createPdf(lines);
+        return MonthlyReportPdf.render(month, currentUser.getRole().name(), projects, monthAlerts,
+                totalBudget, consumedBudget);
     }
 
     private int readThreshold(String key, int fallback) {
@@ -277,7 +246,13 @@ public class AnalyseService {
     private int syncAlert(Projet projet, AlerteType type, AlerteNiveau level, String message) {
         Optional<Alerte> existing = alerteRepository.findByProjetIdAndTypeAndTraitee(projet.getId(), type, false);
         if (level == null) {
-            return resolveAlert(existing);
+            if (existing.isEmpty()) {
+                return 0;
+            }
+            Alerte alert = existing.get();
+            alert.setTraitee(true);
+            alerteRepository.save(alert);
+            return 1;
         }
 
         if (existing.isPresent()) {
@@ -303,94 +278,17 @@ public class AnalyseService {
     }
 
     private int resolveAlert(Projet projet, AlerteType type) {
-        return resolveAlert(alerteRepository.findByProjetIdAndTypeAndTraitee(projet.getId(), type, false));
-    }
-
-    private int resolveAlert(Optional<Alerte> alert) {
-        if (alert.isEmpty()) {
+        Optional<Alerte> existing = alerteRepository.findByProjetIdAndTypeAndTraitee(projet.getId(), type, false);
+        if (existing.isEmpty()) {
             return 0;
         }
-        alert.get().setTraitee(true);
-        alerteRepository.save(alert.get());
+        Alerte alert = existing.get();
+        alert.setTraitee(true);
+        alerteRepository.save(alert);
         return 1;
-    }
-
-    private byte[] createPdf(List<String> lines) {
-        try {
-            List<List<String>> pages = new ArrayList<>();
-            for (int start = 0; start < lines.size(); start += 48) {
-                pages.add(lines.subList(start, Math.min(start + 48, lines.size())));
-            }
-            if (pages.isEmpty()) {
-                pages.add(List.of("Rapport mensuel CDG"));
-            }
-
-            int fontObject = 3 + pages.size() * 2;
-            StringBuilder kids = new StringBuilder();
-            for (int page = 0; page < pages.size(); page++) {
-                int pageObject = 3 + page * 2;
-                kids.append(pageObject).append(" 0 R ");
-            }
-
-            List<byte[]> objects = new ArrayList<>();
-            objects.add(ascii("<< /Type /Catalog /Pages 2 0 R >>"));
-            objects.add(ascii("<< /Type /Pages /Kids [" + kids + "] /Count " + pages.size() + " >>"));
-            for (int page = 0; page < pages.size(); page++) {
-                int pageObject = 3 + page * 2;
-                int contentObject = pageObject + 1;
-                objects.add(ascii("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
-                        + "/Contents " + contentObject + " 0 R /Resources << /Font << /F1 "
-                        + fontObject + " 0 R >> >> >>"));
-                StringBuilder content = new StringBuilder("BT\n/F1 10 Tf\n50 790 Td\n14 TL\n");
-                for (String line : pages.get(page)) {
-                    content.append('(').append(pdfText(line)).append(") Tj\nT*\n");
-                }
-                content.append("ET\n");
-                byte[] stream = ascii(content.toString());
-                ByteArrayOutputStream streamObject = new ByteArrayOutputStream();
-                streamObject.write(ascii("<< /Length " + stream.length + " >>\nstream\n"));
-                streamObject.write(stream);
-                streamObject.write(ascii("endstream"));
-                objects.add(streamObject.toByteArray());
-            }
-            objects.add(ascii("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"));
-
-            ByteArrayOutputStream pdf = new ByteArrayOutputStream();
-            pdf.write(ascii("%PDF-1.4\n"));
-            List<Integer> offsets = new ArrayList<>();
-            for (int index = 0; index < objects.size(); index++) {
-                offsets.add(pdf.size());
-                pdf.write(ascii((index + 1) + " 0 obj\n"));
-                pdf.write(objects.get(index));
-                pdf.write(ascii("\nendobj\n"));
-            }
-
-            int xrefOffset = pdf.size();
-            pdf.write(ascii("xref\n0 " + (objects.size() + 1) + "\n"));
-            pdf.write(ascii("0000000000 65535 f \n"));
-            for (Integer offset : offsets) {
-                pdf.write(ascii(String.format(java.util.Locale.ROOT, "%010d 00000 n \n", offset)));
-            }
-            pdf.write(ascii("trailer\n<< /Size " + (objects.size() + 1) + " /Root 1 0 R >>\n"
-                    + "startxref\n" + xrefOffset + "\n%%EOF\n"));
-            return pdf.toByteArray();
-        } catch (IOException exception) {
-            throw new BusinessException("Impossible de generer le rapport PDF : " + exception.getMessage());
-        }
-    }
-
-    private byte[] ascii(String value) {
-        return value.getBytes(StandardCharsets.US_ASCII);
     }
 
     private record FreelanceDay(Long freelanceId, LocalDate date) {}
 
     private record FreelanceWeek(Long freelanceId, LocalDate weekStart) {}
-
-    private String pdfText(String value) {
-        String normalized = Normalizer.normalize(value == null ? "" : value, Normalizer.Form.NFD)
-                .replaceAll("\\p{M}+", "")
-                .replaceAll("[^\\x20-\\x7E]", "?");
-        return normalized.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)");
-    }
 }

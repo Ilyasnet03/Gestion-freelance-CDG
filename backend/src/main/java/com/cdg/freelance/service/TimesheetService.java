@@ -174,7 +174,7 @@ public class TimesheetService {
         Freelance freelance = getFreelanceForUser(currentUser.getId());
 
         // RG1 : une timesheet couvre une semaine du lundi au dimanche ; semaine_debut est toujours un lundi
-        if (semaineDebut.getDayOfWeek() != DayOfWeek.MONDAY) {
+        if (!DayOfWeek.MONDAY.equals(semaineDebut.getDayOfWeek())) {
             throw new BusinessException("RG1 : La date de début de semaine doit impérativement être un lundi");
         }
 
@@ -192,6 +192,12 @@ public class TimesheetService {
 
     @Transactional
     public LigneTimesheetDto addOrUpdateLigne(Long timesheetId, AddLigneRequest req, UserPrincipal currentUser) {
+        if (req == null || req.getDateSaisie() == null || req.getTacheId() == null || req.getHeures() == null) {
+            throw new BusinessException("Les données de la ligne de temps sont incomplètes");
+        }
+        if (req.getHeures().signum() <= 0) {
+            throw new BusinessException("Le nombre d'heures doit être supérieur à zéro");
+        }
         Timesheet timesheet = timesheetRepository.findById(timesheetId)
                 .orElseThrow(() -> new ResourceNotFoundException("Timesheet non trouvée avec l'id : " + timesheetId));
 

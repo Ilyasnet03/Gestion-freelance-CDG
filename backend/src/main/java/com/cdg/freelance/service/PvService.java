@@ -190,7 +190,7 @@ public class PvService {
             Path path = Paths.get(pv.getCheminPdf());
             if (!Files.exists(path)) {
                 // Regenerate if lost
-                BigDecimal tjm = pv.getTimesheet().getFreelance().getTjm();
+                BigDecimal tjm = determineTjmApplique(pv.getTimesheet());
                 String newPath = generatePdfDocument(pv, pv.getTimesheet(), tjm);
                 pv.setCheminPdf(newPath);
                 pvReceptionRepository.save(pv);
@@ -221,10 +221,10 @@ public class PvService {
             throw new AccessDeniedException("Ce PV ne relève pas de vos missions");
         }
 
-        if (currentUser.getRole() == Role.CHEF_PROJET
-                && timesheet.getLignes() != null
-                && !timesheet.getLignes().isEmpty()) {
-            boolean belongsToChef = timesheet.getLignes().stream()
+        if (currentUser.getRole() == Role.CHEF_PROJET) {
+            List<LigneTimesheet> lignes = ligneTimesheetRepository.findAllByTimesheetId(timesheet.getId());
+            if (!lignes.isEmpty()) {
+                boolean belongsToChef = lignes.stream()
                     .map(LigneTimesheet::getTache)
                     .filter(java.util.Objects::nonNull)
                     .map(Tache::getProjet)
@@ -232,11 +232,12 @@ public class PvService {
                     .map(Projet::getChefProjet)
                     .filter(java.util.Objects::nonNull)
                     .allMatch(chef -> chef.getId().equals(currentUser.getId()))
-                    && timesheet.getLignes().stream().allMatch(line -> line.getTache() != null
+                    && lignes.stream().allMatch(line -> line.getTache() != null
                         && line.getTache().getProjet() != null
                         && line.getTache().getProjet().getChefProjet() != null);
-            if (belongsToChef) {
-                return;
+                if (belongsToChef) {
+                    return;
+                }
             }
         }
 
@@ -261,12 +262,25 @@ public class PvService {
                     && line.getTache().getProjet().getChefProjet().getId().equals(chefProjetId));
     }
 
+    private BigDecimal determineTjmApplique(Timesheet timesheet) {
+        if (timesheet == null) {
+            return BigDecimal.ZERO;
+        }
+        List<LigneTimesheet> lignes = ligneTimesheetRepository.findAllByTimesheetId(timesheet.getId());
+        for (LigneTimesheet ligne : lignes) {
+            if (ligne.getTache() != null
+                    && ligne.getTache().getAffectation() != null
+                    && ligne.getTache().getAffectation().getTjmApplique() != null) {
+                return ligne.getTache().getAffectation().getTjmApplique();
+            }
+        }
+        return timesheet.getFreelance() != null ? timesheet.getFreelance().getTjm() : BigDecimal.ZERO;
+    }
+
     private String generatePdfDocument(PvReception pv, Timesheet timesheet, BigDecimal tjmApplique) {
         try {
             File dir = new File(pvStorageDir);
-            if (!dir.exists()) {
-                dir.mkdirs();
-            }
+            Files.createDirectories(dir.toPath());
 
             String filename = pv.getNumero() + ".pdf";
             File file = new File(dir, filename);
@@ -318,8 +332,9 @@ public class PvService {
                                   String projetNom, String cdpNom,
                                   BigDecimal totalHeures, BigDecimal tjm, BigDecimal montant) throws IOException {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
-        Document document = new Document(PageSize.A4, 48, 48, 42, 42);
-        PdfWriter.getInstance(document, output);
+        Document document = new Document(PageSize.A4, 48, 48, PdfBranding.MARGIN_TOP, PdfBranding.MARGIN_BOTTOM);
+        PdfWriter writer = PdfWriter.getInstance(document, output);
+        writer.setPageEvent(new PdfBranding("Procès-verbal de réception"));
         document.open();
 
         java.awt.Color navy = new java.awt.Color(18, 51, 84);
@@ -328,33 +343,24 @@ public class PvService {
         java.awt.Color grey = new java.awt.Color(102, 112, 123);
         java.awt.Color green = new java.awt.Color(22, 122, 91);
 
-        Font brandFont = new Font(Font.HELVETICA, 9, Font.BOLD, navy);
-        Font titleFont = new Font(Font.HELVETICA, 20, Font.BOLD, navy);
-        Font subtitleFont = new Font(Font.HELVETICA, 10, Font.NORMAL, grey);
         Font sectionFont = new Font(Font.HELVETICA, 11, Font.BOLD, navy);
         Font labelFont = new Font(Font.HELVETICA, 8, Font.BOLD, grey);
         Font valueFont = new Font(Font.HELVETICA, 10, Font.BOLD, navy);
         Font bodyFont = new Font(Font.HELVETICA, 9, Font.NORMAL, navy);
         Font amountFont = new Font(Font.HELVETICA, 16, Font.BOLD, green);
 
-        PdfPTable header = new PdfPTable(new float[]{1f, 2.2f});
+        PdfPTable header = new PdfPTable(new float[]{1f});
         header.setWidthPercentage(100);
         header.setSpacingAfter(16);
-
-        PdfPCell identity = new PdfPCell();
-        identity.setBorder(Rectangle.NO_BORDER);
-        identity.addElement(new Paragraph("GROUPE CDG", brandFont));
-        identity.addElement(new Paragraph("Caisse de Dépôt et de Gestion", subtitleFont));
-        identity.setVerticalAlignment(Element.ALIGN_MIDDLE);
-        header.addCell(identity);
-
-        PdfPCell documentTitle = new PdfPCell();
-        documentTitle.setBorder(Rectangle.NO_BORDER);
-        documentTitle.setHorizontalAlignment(Element.ALIGN_RIGHT);
-        Paragraph title = new Paragraph("PROCÈS-VERBAL\nDE RÉCEPTION", titleFont);
-        title.setAlignment(Element.ALIGN_RIGHT);
-        documentTitle.addElement(title);
-        header.addCell(documentTitle);
+        PdfPCell banner = new PdfPCell();
+        banner.setBorder(Rectangle.NO_BORDER);
+        banner.setBackgroundColor(navy);
+        banner.setPadding(16);
+        Font bannerTitle = new Font(Font.HELVETICA, 20, Font.BOLD, java.awt.Color.WHITE);
+        Font bannerSub = new Font(Font.HELVETICA, 10, Font.NORMAL, new java.awt.Color(190, 225, 228));
+        banner.addElement(new Paragraph("PROCÈS-VERBAL DE RÉCEPTION", bannerTitle));
+        banner.addElement(new Paragraph("N° " + numero + "  ·  Émis le " + dateGen, bannerSub));
+        header.addCell(banner);
         document.add(header);
 
         PdfPTable meta = new PdfPTable(new float[]{1f, 1f});

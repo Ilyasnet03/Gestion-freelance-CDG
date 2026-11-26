@@ -100,6 +100,7 @@ public class TacheService {
     public TacheDto createTache(Long projetId, CreateTacheRequest req) {
         Projet projet = projetRepository.findById(projetId)
                 .orElseThrow(() -> new ResourceNotFoundException("Projet non trouvé avec l'id : " + projetId));
+        validateTaskDates(projet, req.getDateDebut(), req.getDateFin());
 
         Affectation affectation = null;
         if (req.getAffectationId() != null) {
@@ -107,6 +108,14 @@ public class TacheService {
                     .orElseThrow(() -> new ResourceNotFoundException("Affectation non trouvée"));
             if (!affectation.getProjet().getId().equals(projetId)) {
                 throw new BusinessException("L'affectation choisie n'appartient pas à ce projet");
+            }
+            if (req.getDateDebut() != null
+                    && !isAffectionActiveForDate(affectation, req.getDateDebut())) {
+                throw new BusinessException("L'affectation choisie n'est pas active à la date de début de la tâche");
+            }
+            if (req.getDateFin() != null
+                    && !isAffectionActiveForDate(affectation, req.getDateFin())) {
+                throw new BusinessException("L'affectation choisie n'est pas active à la date de fin de la tâche");
             }
         }
 
@@ -142,6 +151,7 @@ public class TacheService {
     public TacheDto updateTache(Long id, UpdateTacheRequest req) {
         Tache t = tacheRepository.findForUpdateById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Tâche non trouvée avec l'id : " + id));
+        validateTaskDates(t.getProjet(), req.getDateDebut(), req.getDateFin());
 
         t.setTitre(req.getTitre().trim());
         BigDecimal hours = req.getHeuresPrevues();
@@ -162,6 +172,8 @@ public class TacheService {
                 t.setStatut(TacheStatut.TERMINEE);
             } else if (req.getAvancement() > 0 && t.getStatut() == TacheStatut.A_FAIRE) {
                 t.setStatut(TacheStatut.EN_COURS);
+            } else if (req.getAvancement() == 0) {
+                t.setStatut(TacheStatut.A_FAIRE);
             }
         }
         if (req.getStatut() != null) {
@@ -199,6 +211,8 @@ public class TacheService {
             t.setStatut(TacheStatut.TERMINEE);
         } else if (req.getAvancement() > 0 && t.getStatut() == TacheStatut.A_FAIRE) {
             t.setStatut(TacheStatut.EN_COURS);
+        } else if (req.getAvancement() == 0) {
+            t.setStatut(TacheStatut.A_FAIRE);
         }
 
         Tache updated = tacheRepository.save(t);
@@ -211,5 +225,27 @@ public class TacheService {
         }
         tache.setHeuresPrevues(hours);
         tache.setChargeEstimee(hours.divide(BigDecimal.valueOf(8), 1, RoundingMode.HALF_UP));
+    }
+
+    private void validateTaskDates(Projet projet, java.time.LocalDate dateDebut, java.time.LocalDate dateFin) {
+        if (dateDebut != null && dateFin != null && dateFin.isBefore(dateDebut)) {
+            throw new BusinessException("La date de fin de la tâche doit être postérieure ou égale à sa date de début");
+        }
+        if (projet != null && dateDebut != null && projet.getDateDebut() != null
+                && dateDebut.isBefore(projet.getDateDebut())) {
+            throw new BusinessException("La date de début de la tâche ne peut pas précéder celle du projet");
+        }
+        if (projet != null && dateFin != null && projet.getDateFinPrevue() != null
+                && dateFin.isAfter(projet.getDateFinPrevue())) {
+            throw new BusinessException("La date de fin de la tâche ne peut pas dépasser celle du projet");
+        }
+    }
+
+    private boolean isAffectionActiveForDate(Affectation affectation, java.time.LocalDate date) {
+        if (affectation == null || affectation.getDateDebut() == null
+                || date.isBefore(affectation.getDateDebut())) {
+            return false;
+        }
+        return affectation.getDateFin() == null || !date.isAfter(affectation.getDateFin());
     }
 }
