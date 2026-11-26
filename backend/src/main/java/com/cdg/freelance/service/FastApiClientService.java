@@ -2,9 +2,10 @@ package com.cdg.freelance.service;
 
 import com.cdg.freelance.exception.BusinessException;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.MediaType;
+import org.springframework.web.client.RestClient;
 
 import java.util.Map;
 
@@ -17,16 +18,17 @@ public class FastApiClientService {
     @Value("${application.security.internal-api-key:cdg-internal-secret-api-key-2026}")
     private String internalApiKey;
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private RestClient restClient = RestClient.create();
 
     public Map<String, Object> executeAnalyses() {
         String url = fastApiUrl + "/analyses/run";
-        HttpHeaders headers = createHeaders();
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-
         try {
-            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.POST, entity, Map.class);
-            return response.getBody();
+            return restClient.post()
+                    .uri(url)
+                    .header("X-Internal-API-Key", internalApiKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<Map<String, Object>>() {});
         } catch (Exception e) {
             throw new BusinessException("Impossible de contacter le microservice d'analyse FastAPI (" + fastApiUrl + ") : " + e.getMessage());
         }
@@ -34,21 +36,15 @@ public class FastApiClientService {
 
     public byte[] generateMonthlyReportPdf(String mois) {
         String url = fastApiUrl + "/rapports/mensuel?mois=" + (mois != null ? mois : "");
-        HttpHeaders headers = createHeaders();
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-
         try {
-            ResponseEntity<byte[]> response = restTemplate.exchange(url, HttpMethod.POST, entity, byte[].class);
-            return response.getBody();
+            return restClient.post()
+                    .uri(url)
+                    .header("X-Internal-API-Key", internalApiKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .retrieve()
+                    .body(byte[].class);
         } catch (Exception e) {
             throw new BusinessException("Impossible de générer le rapport mensuel auprès de FastAPI : " + e.getMessage());
         }
-    }
-
-    private HttpHeaders createHeaders() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("X-Internal-API-Key", internalApiKey);
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        return headers;
     }
 }

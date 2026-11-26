@@ -20,6 +20,7 @@
         <springdoc.version>3.2.1</springdoc.version>
         <jacoco.version>0.8.13</jacoco.version>
         <sonar-maven-plugin.version>5.2.0.4988</sonar-maven-plugin.version>
+        <tomcat.version>11.0.29</tomcat.version>
     </properties>
 
     <dependencies>
