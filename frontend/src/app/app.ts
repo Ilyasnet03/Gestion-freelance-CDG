@@ -603,7 +603,13 @@ export class App implements OnInit {
           step: 1,
         },
         { key: 'dateDebut', label: 'Date de début', type: 'date', required: true },
-        { key: 'dateFinPrevue', label: 'Date de fin prévue', type: 'date', required: true },
+        {
+          key: 'dateFinPrevue',
+          label: 'Date de fin prévue',
+          type: 'date',
+          required: false,
+          hint: 'Facultative — deux mois par défaut',
+        },
         {
           key: 'typeProjetId',
           label: 'Type de projet',
@@ -627,7 +633,7 @@ export class App implements OnInit {
         fields,
         values: {
           dateDebut: today,
-          dateFinPrevue: today,
+          dateFinPrevue: this.addMonthsToDate(today, 2),
         },
       };
     } else if (this.currentView === 'timesheets') {
@@ -698,7 +704,7 @@ export class App implements OnInit {
           heuresPrevues: Number(values['heuresPrevues']),
           nombreTachesPrevues: Number(values['nombreTachesPrevues']),
           dateDebut: values['dateDebut'],
-          dateFinPrevue: values['dateFinPrevue'],
+          dateFinPrevue: values['dateFinPrevue'] || null,
           typeProjetId: Number(values['typeProjetId']),
           chefProjetId: this.user?.id,
           description: values['description'] ?? '',
@@ -1214,7 +1220,13 @@ export class App implements OnInit {
             step: 1,
           },
           { key: 'dateDebut', label: 'Date de début', type: 'date', required: true },
-          { key: 'dateFinPrevue', label: 'Date de fin prévue', type: 'date', required: true },
+          {
+            key: 'dateFinPrevue',
+            label: 'Date de fin prévue',
+            type: 'date',
+            required: false,
+            hint: 'Facultative — deux mois par défaut',
+          },
           {
             key: 'typeProjetId',
             label: 'Type de projet',
@@ -1262,7 +1274,7 @@ export class App implements OnInit {
         heuresPrevues: Number(values['heuresPrevues']),
         nombreTachesPrevues: Number(values['nombreTachesPrevues']),
         dateDebut: values['dateDebut'],
-        dateFinPrevue: values['dateFinPrevue'],
+        dateFinPrevue: values['dateFinPrevue'] || null,
         typeProjetId: Number(values['typeProjetId']),
         statut: values['statut'],
       });
@@ -1661,6 +1673,16 @@ export class App implements OnInit {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+
+  private addMonthsToDate(dateValue: string, months: number): string {
+    const date = new Date(`${dateValue}T00:00:00`);
+    const originalDay = date.getDate();
+    date.setDate(1);
+    date.setMonth(date.getMonth() + months);
+    const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    date.setDate(Math.min(originalDay, lastDay));
+    return this.dateInputValue(date);
   }
 
   private formatDate(value: string): string {

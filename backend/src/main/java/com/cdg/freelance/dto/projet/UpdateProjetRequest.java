@@ -29,7 +29,6 @@ public class UpdateProjetRequest {
     @NotNull(message = "La date de début est obligatoire")
     private LocalDate dateDebut;
 
-    @NotNull(message = "La date de fin prévue est obligatoire")
     private LocalDate dateFinPrevue;
 
     private ProjetStatut statut;

@@ -118,6 +118,9 @@ public class TacheService {
                 throw new BusinessException("L'affectation choisie n'est pas active à la date de fin de la tâche");
             }
         }
+        if (affectation != null) {
+            validateSimultaneousTaskLimit(affectation, null, req.getDateDebut(), req.getDateFin());
+        }
 
         Tache t = new Tache();
         t.setProjet(projet);
@@ -187,6 +190,9 @@ public class TacheService {
             }
             t.setAffectation(aff);
         }
+        if (t.getAffectation() != null) {
+            validateSimultaneousTaskLimit(t.getAffectation(), t.getId(), req.getDateDebut(), req.getDateFin());
+        }
         t.setDateDebut(req.getDateDebut());
         t.setDateFin(req.getDateFin());
 
@@ -247,5 +253,44 @@ public class TacheService {
             return false;
         }
         return affectation.getDateFin() == null || !date.isAfter(affectation.getDateFin());
+    }
+
+    private void validateSimultaneousTaskLimit(Affectation affectation, Long excludedTaskId,
+                                               java.time.LocalDate start, java.time.LocalDate end) {
+        if (affectation == null || affectation.getFreelance() == null) {
+            return;
+        }
+
+        java.time.LocalDate periodStart = start != null ? start : affectation.getDateDebut();
+        java.time.LocalDate periodEnd = end != null ? end : affectation.getDateFin();
+        int overlappingActiveTasks = 0;
+
+        for (Tache existing : tacheRepository.findAllByAffectationFreelanceId(affectation.getFreelance().getId())) {
+            if (excludedTaskId != null && excludedTaskId.equals(existing.getId())) {
+                continue;
+            }
+            if (existing.getStatut() == TacheStatut.TERMINEE) {
+                continue;
+            }
+            if (periodsOverlap(periodStart, periodEnd, existing.getDateDebut(), existing.getDateFin())) {
+                overlappingActiveTasks++;
+            }
+        }
+
+        if (overlappingActiveTasks >= 4) {
+            throw new BusinessException(
+                    "Le freelance ne peut pas avoir plus de quatre tâches non terminées simultanément.");
+        }
+    }
+
+    private boolean periodsOverlap(java.time.LocalDate startA, java.time.LocalDate endA,
+                                   java.time.LocalDate startB, java.time.LocalDate endB) {
+        if (startA != null && endB != null && endB.isBefore(startA)) {
+            return false;
+        }
+        if (startB != null && endA != null && endA.isBefore(startB)) {
+            return false;
+        }
+        return true;
     }
 }

@@ -100,7 +100,8 @@ public class ProjetService {
             throw new BusinessException("Un projet avec ce code existe déjà : " + req.getCode());
         }
 
-        if (req.getDateFinPrevue().isBefore(req.getDateDebut())) {
+        LocalDate dateFinPrevue = resolveProjectEndDate(req.getDateDebut(), req.getDateFinPrevue());
+        if (dateFinPrevue.isBefore(req.getDateDebut())) {
             throw new BusinessException("La date de fin prévue doit être postérieure à la date de début");
         }
 
@@ -125,7 +126,7 @@ public class ProjetService {
         p.setHeuresPrevues(req.getHeuresPrevues());
         p.setNombreTachesPrevues(req.getNombreTachesPrevues());
         p.setDateDebut(req.getDateDebut());
-        p.setDateFinPrevue(req.getDateFinPrevue());
+        p.setDateFinPrevue(dateFinPrevue);
         p.setStatut(ProjetStatut.PLANIFIE);
         p.setTypeProjet(tp);
         p.setChefProjet(cdp);
@@ -147,7 +148,8 @@ public class ProjetService {
             throw new AccessDeniedException("Un chef de projet ne peut pas transférer son projet à un autre compte");
         }
 
-        if (req.getDateFinPrevue().isBefore(req.getDateDebut())) {
+        LocalDate dateFinPrevue = resolveProjectEndDate(req.getDateDebut(), req.getDateFinPrevue());
+        if (dateFinPrevue.isBefore(req.getDateDebut())) {
             throw new BusinessException("La date de fin prévue doit être postérieure à la date de début");
         }
 
@@ -157,7 +159,7 @@ public class ProjetService {
         if (req.getHeuresPrevues() != null) p.setHeuresPrevues(req.getHeuresPrevues());
         if (req.getNombreTachesPrevues() != null) p.setNombreTachesPrevues(req.getNombreTachesPrevues());
         p.setDateDebut(req.getDateDebut());
-        p.setDateFinPrevue(req.getDateFinPrevue());
+        p.setDateFinPrevue(dateFinPrevue);
 
         if (req.getStatut() != null) {
             p.setStatut(req.getStatut());
@@ -192,24 +194,22 @@ public class ProjetService {
         Freelance freelance = freelanceRepository.findById(req.getFreelanceId())
                 .orElseThrow(() -> new ResourceNotFoundException("Freelance non trouvé avec l'id : " + req.getFreelanceId()));
 
-        // RG2 : un freelance a au plus une affectation active à la fois
-        List<Affectation> activeAffectations = affectationRepository.findActiveAffectationsByFreelanceAndDate(
-                freelance.getId(), req.getDateDebut());
+        java.util.Set<Long> overlappingProjectIds = new java.util.HashSet<>();
+        for (Affectation existing : affectationRepository.findAllByFreelanceId(freelance.getId())) {
+            if (existing.getProjet() == null || existing.getProjet().getId() == null) {
+                continue;
+            }
+            if (periodsOverlap(req.getDateDebut(), req.getDateFin(),
+                    existing.getDateDebut(), existing.getDateFin())) {
+                overlappingProjectIds.add(existing.getProjet().getId());
+            }
+        }
 
-        for (Affectation existing : activeAffectations) {
-            // Check date overlap
-            boolean overlap = true;
-            if (req.getDateFin() != null && existing.getDateDebut().isAfter(req.getDateFin())) {
-                overlap = false;
-            }
-            if (existing.getDateFin() != null && req.getDateDebut().isAfter(existing.getDateFin())) {
-                overlap = false;
-            }
-            if (overlap) {
-                throw new BusinessException("RG2 : Le freelance " + freelance.getUtilisateur().getPrenom() + " " +
-                        freelance.getUtilisateur().getNom() + " a déjà une affectation active sur le projet " +
-                        existing.getProjet().getNom() + " sur cette période.");
-            }
+        overlappingProjectIds.remove(projet.getId());
+        if (overlappingProjectIds.size() >= 2) {
+            throw new BusinessException("RG2 : Le freelance " + freelance.getUtilisateur().getPrenom() + " " +
+                    freelance.getUtilisateur().getNom() +
+                    " est déjà affecté à deux projets distincts pendant cette période.");
         }
 
         Affectation affectation = new Affectation();
@@ -221,6 +221,20 @@ public class ProjetService {
 
         Affectation saved = affectationRepository.save(affectation);
         return mapper.toAffectationDto(saved);
+    }
+
+    private boolean periodsOverlap(LocalDate startA, LocalDate endA, LocalDate startB, LocalDate endB) {
+        if (startA != null && endB != null && endB.isBefore(startA)) {
+            return false;
+        }
+        if (startB != null && endA != null && endA.isBefore(startB)) {
+            return false;
+        }
+        return true;
+    }
+
+    private LocalDate resolveProjectEndDate(LocalDate dateDebut, LocalDate dateFinPrevue) {
+        return dateFinPrevue != null ? dateFinPrevue : dateDebut.plusMonths(2);
     }
 
     @Transactional(readOnly = true)

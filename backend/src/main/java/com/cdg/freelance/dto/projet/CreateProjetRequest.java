@@ -34,7 +34,6 @@ public class CreateProjetRequest {
     @NotNull(message = "La date de début est obligatoire")
     private LocalDate dateDebut;
 
-    @NotNull(message = "La date de fin prévue est obligatoire")
     private LocalDate dateFinPrevue;
 
     @NotNull(message = "Le type de projet est obligatoire")

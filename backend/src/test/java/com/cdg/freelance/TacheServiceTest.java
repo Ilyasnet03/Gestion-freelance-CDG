@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -103,6 +104,48 @@ class TacheServiceTest {
 
         assertEquals(1, service.listMesMissions(new UserPrincipal(user), true).size());
         assertEquals(2, service.listMesMissions(new UserPrincipal(user), false).size());
+    }
+
+    @Test
+    void rejectsFifthSimultaneousTaskForFreelance() {
+        LocalDate periodStart = LocalDate.of(2026, 1, 1);
+        Projet project = new Projet();
+        project.setId(1L);
+        project.setDateDebut(periodStart);
+        project.setDateFinPrevue(LocalDate.of(2026, 12, 31));
+
+        Freelance freelance = new Freelance();
+        freelance.setId(10L);
+        Affectation affectation = new Affectation();
+        affectation.setId(20L);
+        affectation.setFreelance(freelance);
+        affectation.setProjet(project);
+        affectation.setDateDebut(periodStart);
+        affectation.setDateFin(LocalDate.of(2026, 12, 31));
+
+        List<Tache> existingTasks = new java.util.ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            Tache task = new Tache();
+            task.setId((long) i + 1);
+            task.setStatut(TacheStatut.EN_COURS);
+            task.setDateDebut(periodStart);
+            task.setDateFin(LocalDate.of(2026, 6, 30));
+            existingTasks.add(task);
+        }
+
+        CreateTacheRequest request = new CreateTacheRequest();
+        request.setTitre("Cinquième tâche");
+        request.setHeuresPrevues(new BigDecimal("8"));
+        request.setAffectationId(20L);
+        request.setDateDebut(periodStart);
+        request.setDateFin(LocalDate.of(2026, 5, 31));
+
+        when(projetRepository.findById(1L)).thenReturn(Optional.of(project));
+        when(affectationRepository.findById(20L)).thenReturn(Optional.of(affectation));
+        when(tacheRepository.findAllByAffectationFreelanceId(10L)).thenReturn(existingTasks);
+
+        assertThrows(BusinessException.class, () -> service.createTache(1L, request));
+        verify(tacheRepository, never()).save(any());
     }
 
     @Test
